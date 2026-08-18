@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "node --test src/events.test.js src/session.test.js",
+    "test": "node --test src/events.test.js src/session.test.js src/magiVisualState.test.js",
     "build": "vite build",
     "dev": "vite"
   },
