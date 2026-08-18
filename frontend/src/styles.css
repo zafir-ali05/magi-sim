@@ -8,7 +8,7 @@
   text-rendering: optimizeLegibility;
   --ink: #e6e8e4;
   --muted: #919895;
-  --faint: #59615f;
+  --faint: #75817d;
   --line: #2a3231;
   --line-bright: #45504d;
   --panel: #0f1315;
@@ -221,7 +221,7 @@ textarea {
 }
 
 textarea::placeholder {
-  color: #69726f;
+  color: var(--muted);
 }
 
 textarea:disabled {

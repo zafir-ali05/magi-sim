@@ -2,24 +2,9 @@ import { useEffect, useRef, useState } from "react";
 
 import { CORE_IDS, parseNdjsonChunk, parseStreamEvent, StreamProtocolError } from "./events.js";
 import { CorePanel } from "./CorePanel.jsx";
+import { createSession } from "./session.js";
 
 const MAX_REACTION_ROUNDS = 3;
-
-function createSession(startedAt = null) {
-  return {
-    status: "idle",
-    phase: "STANDBY",
-    activeCores: [],
-    acts: [],
-    round: 0,
-    ballotsLocked: false,
-    ballots: null,
-    result: null,
-    error: "",
-    startedAt,
-    elapsedMs: 0,
-  };
-}
 
 function formatElapsed(milliseconds) {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
