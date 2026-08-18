@@ -111,11 +111,11 @@ Five backend modules are enough: contracts, prompts, provider call, orchestratio
 - Produces: `ask_deepseek(core: CoreId, messages: list[dict[str, str]], schema: type[T], effort: Literal["high", "max"], max_tokens: int) -> T`.
 - Produces: `opening_messages`, `reaction_messages`, and `ballot_messages` prompt builders.
 
-- [ ] **Step 1: Configure the backend package**
+- [x] **Step 1: Configure the backend package**
 
 Use only `fastapi`, `uvicorn[standard]`, `pydantic`, `pydantic-settings`, and `openai` at runtime. Use `pytest`, `pytest-asyncio`, and `httpx` for development. Set Python to `>=3.12` and pytest asyncio mode to `auto`.
 
-- [ ] **Step 2: Define strict public models**
+- [x] **Step 2: Define strict public models**
 
 Define these minimum shapes in `models.py`:
 
@@ -172,11 +172,11 @@ class ErrorEvent(BaseModel):
 StreamEvent = PhaseEvent | ActEvent | BallotsLockedEvent | ResultEvent | ErrorEvent
 ```
 
-- [ ] **Step 3: Write the three prompt identities**
+- [x] **Step 3: Write the three prompt identities**
 
 Keep the canonical facet separate from the operational lens. Each builder includes the motion, required JSON example, word limit, instruction to address concrete peer claims, and instruction never to reveal hidden reasoning. Reactions receive the numbered frozen transcript and remaining-round count. Ballots receive the final transcript and cannot see peer ballots.
 
-- [ ] **Step 4: Write and run focused provider tests first**
+- [x] **Step 4: Write and run focused provider tests first**
 
 Using `unittest.mock` only at the external SDK boundary, verify request construction uses the fixed model, thinking mode, JSON Object output, requested reasoning effort, and token limit. Verify one malformed response is retried, a second failure raises a sanitized error, a mismatched returned core is rejected, and neither the API key nor `reasoning_content` appears in the returned model or exception text.
 
@@ -184,13 +184,13 @@ Run: `cd backend && pytest tests/test_deepseek.py -q`
 
 Expected: failure because `ask_deepseek` does not exist.
 
-- [ ] **Step 5: Implement one direct provider function**
+- [x] **Step 5: Implement one direct provider function**
 
 Read `DEEPSEEK_API_KEY` directly with `os.environ`; when the provider function is called without it, raise a clear sanitized configuration error. Construct `AsyncOpenAI(api_key=key, base_url="https://api.deepseek.com")`. Request the fixed `deepseek-v4-flash` model, thinking mode, JSON Object output, the supplied effort, and `max_tokens=4096` for public acts or `8192` for ballots. Parse only `message.content` into `schema`; verify the returned `core` matches the requested identity, account for usage, discard `reasoning_content`, and retry once on provider failure, empty content, truncation, JSON failure, or Pydantic failure.
 
 Do not add a `ModelClient` interface, provider factory, generic plugin system, temperature settings, or provider-managed conversation state.
 
-- [ ] **Step 6: Add environment examples and run checks**
+- [x] **Step 6: Add environment examples and run checks**
 
 ```dotenv
 DEEPSEEK_API_KEY=
@@ -219,7 +219,7 @@ Expected: provider tests pass, and a valid `Motion` prints without importing or 
 - Produces: `async deliberate(motion: Motion, ask=ask_deepseek) -> AsyncIterator[StreamEvent]`; injected `ask` callables must accept the same arguments as `ask_deepseek`.
 - Produces stream event types: `phase`, `act`, `ballots_locked`, `result`, and `error`.
 
-- [ ] **Step 1: Write one complete fake-driven test**
+- [x] **Step 1: Write one complete fake-driven test**
 
 Use a tiny async fake function with queued `Act` and `Ballot` values. Assert:
 
@@ -234,19 +234,19 @@ assert final_result_preserves_the_conditional_vote_and_dissent
 
 Also test the hard ceiling: when readiness never converges, each core receives exactly three reaction calls before balloting.
 
-- [ ] **Step 2: Run the test and confirm it fails**
+- [x] **Step 2: Run the test and confirm it fails**
 
 Run: `cd backend && pytest tests/test_deliberation.py -q`
 
 Expected: failure because `deliberate` does not exist.
 
-- [ ] **Step 3: Implement openings and synchronized reaction rounds**
+- [x] **Step 3: Implement openings and synchronized reaction rounds**
 
 Use `asyncio.gather` for the three openings. Commit each validated opening with a monotonically increasing integer ID. For rounds 1 through 3, freeze the numbered transcript, call all three cores concurrently, then commit their validated acts in canonical core order. Stop if all three acts in one round are `READY`; otherwise continue.
 
 This barrier is intentional. Do not add inboxes, workers, locks, novelty classifiers, readiness revocation, or a general state machine.
 
-- [ ] **Step 4: Implement private ballots and deterministic reduction**
+- [x] **Step 4: Implement private ballots and deterministic reduction**
 
 Freeze the transcript once, request all three ballots concurrently, emit one `ballots_locked` status after all validate, then compute:
 
@@ -256,7 +256,7 @@ Freeze the transcript once, request all three ballots concurrently, emit one `ba
 
 The `result` event contains all three ballots, deduplicated conditions, and a decision-support disclaimer. Never convert a failed core into `DISAGREE`.
 
-- [ ] **Step 5: Add the single failure path and run tests**
+- [x] **Step 5: Add the single failure path and run tests**
 
 Wrap the whole discussion in a five-minute `asyncio.timeout`. On unrecovered provider, validation, or timeout failure, yield one sanitized `error` event and stop without a result.
 
@@ -276,11 +276,11 @@ Expected: all deliberation tests pass.
 - Consumes: `Motion` and `deliberate`.
 - Produces: `POST /api/discuss` with `application/x-ndjson` output.
 
-- [ ] **Step 1: Write the API test**
+- [x] **Step 1: Write the API test**
 
 Override the deliberation dependency with a short async generator. Submit a valid motion and assert each non-empty response line parses as JSON in order. Assert a two-character question returns `422`, and assert the response never includes `reasoning_content` or an API key.
 
-- [ ] **Step 2: Implement the endpoint**
+- [x] **Step 2: Implement the endpoint**
 
 Encode each event as one compact JSON object followed by `\n`:
 
@@ -295,7 +295,7 @@ async def discuss(motion: Motion) -> StreamingResponse:
 
 Allow `http://localhost:5173` during local development. Do not add origin settings, IDs, repositories, replay buffers, heartbeats, snapshot endpoints, cancellation endpoints, health endpoints, or RFC problem-detail wrappers.
 
-- [ ] **Step 3: Run the backend checks**
+- [x] **Step 3: Run the backend checks**
 
 Run: `cd backend && pytest -q`
 
@@ -381,15 +381,15 @@ Expected: all commands exit successfully. No Docker, Playwright, CI matrix, depl
 
 ## Lean MVP acceptance checklist
 
-- [ ] The three openings are independent and generated concurrently.
-- [ ] Every core can react to peer content for up to three rounds and can stop with `READY` or `PASS`.
-- [ ] The public transcript contains only validated content, never hidden reasoning.
-- [ ] Ballots use one frozen transcript and appear simultaneously.
-- [ ] The result preserves all three votes, dissent, rationale, and conditions.
+- [x] The three openings are independent and generated concurrently.
+- [x] Every core can react to peer content for up to three rounds and can stop with `READY` or `PASS`.
+- [x] The public transcript contains only validated content, never hidden reasoning.
+- [x] Ballots use one frozen transcript and appear simultaneously.
+- [x] The result preserves all three votes, dissent, rationale, and conditions.
 - [ ] The UI visibly distinguishes analysis, discussion, ballot lock, completion, and failure.
-- [ ] The discussion terminates after three reaction rounds or five minutes.
-- [ ] A failed core produces an explicit failed session rather than fabricated consensus.
-- [ ] The server keeps the DeepSeek key and `reasoning_content` out of the stream.
+- [x] The discussion terminates after three reaction rounds or five minutes.
+- [x] A failed core produces an explicit failed session rather than fabricated consensus.
+- [x] The server keeps the DeepSeek key and `reasoning_content` out of the stream.
 - [ ] Backend tests, frontend type-checking, and the production frontend build pass.
 
 ## Promotion rule
