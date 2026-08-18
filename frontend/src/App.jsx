@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 
 import { CORE_IDS, parseNdjsonChunk, parseStreamEvent, StreamProtocolError } from "./events.js";
-import { CorePanel } from "./CorePanel.jsx";
+import { CoreResponseDialog } from "./CoreResponseDialog.jsx";
+import { MagiCoreArray } from "./MagiCoreArray.jsx";
+import { buildCoreDialogModel } from "./magiVisualState.js";
 import { createSession } from "./session.js";
 
 const MAX_REACTION_ROUNDS = 3;
@@ -33,6 +35,8 @@ function isRunning(status) {
 export default function App() {
   const [question, setQuestion] = useState("");
   const [context, setContext] = useState("");
+  const [submittedQuestion, setSubmittedQuestion] = useState("");
+  const [selectedCore, setSelectedCore] = useState(null);
   const [session, setSession] = useState(() => createSession());
   const controllerRef = useRef(null);
   const requestIdRef = useRef(0);
@@ -114,6 +118,8 @@ export default function App() {
     controllerRef.current = null;
     setQuestion("");
     setContext("");
+    setSubmittedQuestion("");
+    setSelectedCore(null);
     setSession(createSession());
   };
 
@@ -128,6 +134,8 @@ export default function App() {
     controllerRef.current = controller;
     const startedAt = Date.now();
     const motion = { question: question.trim(), context: context.trim() };
+    setSubmittedQuestion(motion.question);
+    setSelectedCore(null);
     setSession(createSession(startedAt));
 
     let terminalEventSeen = false;
@@ -188,6 +196,24 @@ export default function App() {
       : session.phase === "DISCUSSION"
         ? Math.max(0, MAX_REACTION_ROUNDS - session.round)
         : 0;
+
+  const selectedBallot =
+    selectedCore && session.result
+      ? session.ballots?.find((ballot) => ballot.core === selectedCore) ?? null
+      : null;
+  const dialogModel = selectedCore
+    ? buildCoreDialogModel({
+        core: selectedCore,
+        question: submittedQuestion || question.trim(),
+        phase: session.phase,
+        sessionStatus: session.status,
+        activeCores: session.activeCores,
+        acts: session.acts,
+        ballot: selectedBallot,
+        ballotsLocked: session.ballotsLocked,
+        error: session.error,
+      })
+    : null;
 
   return (
     <main className="console-shell" aria-busy={isRunning(session.status)}>
@@ -312,20 +338,25 @@ export default function App() {
             </div>
             <span className="section-side-note">{CORE_IDS.length} / {CORE_IDS.length} ONLINE</span>
           </div>
-          <div className="core-grid">
-            {CORE_IDS.map((core) => (
-              <CorePanel
-                key={core}
-                core={core}
-                acts={session.acts.filter((event) => event.act.core === core)}
-                active={session.activeCores.includes(core)}
-                ballot={session.ballots?.find((ballot) => ballot.core === core) ?? null}
-                ballotsLocked={session.ballotsLocked || session.phase === "BALLOTING"}
-                phase={session.phase}
-              />
-            ))}
-          </div>
+          <MagiCoreArray
+            phase={session.phase}
+            sessionStatus={session.status}
+            activeCores={session.activeCores}
+            acts={session.acts}
+            ballots={session.result ? session.ballots : null}
+            ballotsLocked={session.ballotsLocked}
+            result={session.result}
+            elapsedMs={session.elapsedMs}
+            round={session.round}
+            onSelectCore={setSelectedCore}
+          />
         </section>
+
+        <CoreResponseDialog
+          open={Boolean(selectedCore)}
+          model={dialogModel}
+          onClose={() => setSelectedCore(null)}
+        />
 
         <section className="transcript-section" aria-labelledby="transcript-heading">
           <div className="section-heading section-heading--inline">
