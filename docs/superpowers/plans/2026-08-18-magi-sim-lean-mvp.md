@@ -308,18 +308,20 @@ Expected: both test files pass without a real API key or network access.
 - Create: `frontend/package.json`
 - Create: `frontend/vite.config.js`
 - Create: `frontend/src/events.js`
-- Create: `frontend/src/CorePanel.jsx`
+- Create: `frontend/src/MagiCoreArray.jsx`
+- Create: `frontend/src/CoreResponseDialog.jsx`
+- Create: `frontend/src/magiVisualState.js`
 - Create: `frontend/src/App.jsx`
 - Create: `frontend/src/styles.css`
 - Create: `frontend/src/main.jsx`
 
 **Interfaces:**
 - Consumes: the NDJSON event stream from `POST /api/discuss`.
-- Produces: motion form, live phase display, three core panels, shared transcript, concealed ballot state, simultaneous reveal, and final result.
+- Produces: motion form, live phase display, reference-faithful tri-core array, public-response modal, shared transcript, concealed ballot state, simultaneous reveal, and final result.
 
 - [x] **Step 1: Configure only the selected dependencies**
 
-Install React, React DOM, Tailwind's Vite plugin, and Motion. Do not install shadcn, Radix, Zod, a state library, a router, an SSE library, or a component test framework.
+Install React, React DOM, and Tailwind's Vite plugin. Do not install Motion, shadcn, Radix, Zod, a state library, a router, an SSE library, or a component test framework. The reference flicker and state transitions use CSS.
 
 - [x] **Step 2: Define the small runtime event validator**
 
@@ -331,9 +333,9 @@ Submit with `fetch`, read `response.body` through `TextDecoderStream`, retain an
 
 - [x] **Step 4: Build the core experience**
 
-Use one accessible form and three `CorePanel` instances. Show the current phase, elapsed time, active cores, committed acts in order, and up to three remaining reaction rounds. During balloting show only locked indicators. Apply all three ballot values from the single `result` event so they reveal together.
+Use one accessible form and the `MagiCoreArray` tri-core schematic. Show the current phase, elapsed time, active cores, committed acts in order, and up to three remaining reaction rounds. During balloting show only locked indicators. Apply all three ballot values from the single `result` event so they reveal together. Selecting a core opens `CoreResponseDialog` with only its committed public acts and any revealed ballot.
 
-Use CSS for the technical grid, panel geometry, labels, responsive single-column layout, focus states, and `prefers-reduced-motion`. Use Motion only for core activity and the synchronized ballot reveal. Do not add audio, maintenance mode, event-ID controls, reply-link diagrams, themes, sharing, or export.
+Adapt the exact frontend grid, polygon clip paths, amber connectors, Japanese status headings, palette, modal composition, and flicker behavior from Tomasz Rewak's MAGI commit `98a4d0184b1b0013e2216689c770127b6aff2efc`. Preserve responsive layout, focus states, and `prefers-reduced-motion`. Do not add audio, maintenance mode, event-ID controls, reply-link diagrams, themes, sharing, or export.
 
 - [x] **Step 5: Verify the frontend**
 
@@ -345,6 +347,10 @@ npm run build
 ```
 
 Expected: the production build exits successfully. Manually run one fake or real discussion and confirm the UI remains informative during a multi-minute response.
+
+- [x] **Step 6: Verify the reference-faithful frontend port**
+
+The exact schematic, response modal, status-color mapping, ballot privacy tests, deterministic browser fixture, full MIT attribution, desktop comparison, and 320px/390px responsive checks are implemented by the [exact MAGI frontend port plan](2026-08-18-exact-magi-ui-port.md).
 
 ---
 
