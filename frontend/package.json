@@ -1,0 +1,19 @@
+{
+  "name": "magi-sim-console",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "node --test src/events.test.js src/session.test.js",
+    "build": "vite build",
+    "dev": "vite"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.1.12",
+    "motion": "^12.23.12",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "tailwindcss": "^4.1.12",
+    "vite": "^7.1.3"
+  }
+}
