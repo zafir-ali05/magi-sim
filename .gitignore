@@ -1,4 +1,6 @@
 .worktrees/
 .superpowers/
 docs/
-.env.example
+.env
+frontend/node_modules/
+backend/src/magi/__pycache__/
