@@ -276,11 +276,11 @@ Expected: all deliberation tests pass.
 - Consumes: `Motion` and `deliberate`.
 - Produces: `POST /api/discuss` with `application/x-ndjson` output.
 
-- [ ] **Step 1: Write the API test**
+- [x] **Step 1: Write the API test**
 
 Override the deliberation dependency with a short async generator. Submit a valid motion and assert each non-empty response line parses as JSON in order. Assert a two-character question returns `422`, and assert the response never includes `reasoning_content` or an API key.
 
-- [ ] **Step 2: Implement the endpoint**
+- [x] **Step 2: Implement the endpoint**
 
 Encode each event as one compact JSON object followed by `\n`:
 
@@ -295,7 +295,7 @@ async def discuss(motion: Motion) -> StreamingResponse:
 
 Allow `http://localhost:5173` during local development. Do not add origin settings, IDs, repositories, replay buffers, heartbeats, snapshot endpoints, cancellation endpoints, health endpoints, or RFC problem-detail wrappers.
 
-- [ ] **Step 3: Run the backend checks**
+- [x] **Step 3: Run the backend checks**
 
 Run: `cd backend && pytest -q`
 
@@ -389,7 +389,7 @@ Expected: all commands exit successfully. No Docker, Playwright, CI matrix, depl
 - [ ] The UI visibly distinguishes analysis, discussion, ballot lock, completion, and failure.
 - [x] The discussion terminates after three reaction rounds or five minutes.
 - [x] A failed core produces an explicit failed session rather than fabricated consensus.
-- [ ] The server keeps the DeepSeek key and `reasoning_content` out of the stream.
+- [x] The server keeps the DeepSeek key and `reasoning_content` out of the stream.
 - [ ] Backend tests, frontend type-checking, and the production frontend build pass.
 
 ## Promotion rule
