@@ -317,25 +317,25 @@ Expected: both test files pass without a real API key or network access.
 - Consumes: the NDJSON event stream from `POST /api/discuss`.
 - Produces: motion form, live phase display, three core panels, shared transcript, concealed ballot state, simultaneous reveal, and final result.
 
-- [ ] **Step 1: Configure only the selected dependencies**
+- [x] **Step 1: Configure only the selected dependencies**
 
 Install React, React DOM, Tailwind's Vite plugin, and Motion. Do not install shadcn, Radix, Zod, a state library, a router, an SSE library, or a component test framework.
 
-- [ ] **Step 2: Define the small runtime event validator**
+- [x] **Step 2: Define the small runtime event validator**
 
 Implement `parseStreamEvent(value)` in `events.js` for only `phase`, `act`, `ballots_locked`, `result`, and `error`. Use explicit object, field, array, and string checks at this network boundary. Parse NDJSON lines defensively in `App.jsx`; malformed values and unknown event types become a visible protocol error rather than modifying state.
 
-- [ ] **Step 3: Implement streaming fetch**
+- [x] **Step 3: Implement streaming fetch**
 
 Submit with `fetch`, read `response.body` through `TextDecoderStream`, retain an incomplete trailing line between chunks, and apply complete JSON lines to local React state. Disable submission while active. `AbortController` cancels the request when the component unmounts or the user starts over after an error.
 
-- [ ] **Step 4: Build the core experience**
+- [x] **Step 4: Build the core experience**
 
 Use one accessible form and three `CorePanel` instances. Show the current phase, elapsed time, active cores, committed acts in order, and up to three remaining reaction rounds. During balloting show only locked indicators. Apply all three ballot values from the single `result` event so they reveal together.
 
 Use CSS for the technical grid, panel geometry, labels, responsive single-column layout, focus states, and `prefers-reduced-motion`. Use Motion only for core activity and the synchronized ballot reveal. Do not add audio, maintenance mode, event-ID controls, reply-link diagrams, themes, sharing, or export.
 
-- [ ] **Step 5: Verify the frontend**
+- [x] **Step 5: Verify the frontend**
 
 Run:
 
@@ -383,11 +383,11 @@ Expected: all commands exit successfully. No Docker, Playwright, CI matrix, depl
 - [x] The public transcript contains only validated content, never hidden reasoning.
 - [x] Ballots use one frozen transcript and appear simultaneously.
 - [x] The result preserves all three votes, dissent, rationale, and conditions.
-- [ ] The UI visibly distinguishes analysis, discussion, ballot lock, completion, and failure.
+- [x] The UI visibly distinguishes analysis, discussion, ballot lock, completion, and failure.
 - [x] The discussion terminates after three reaction rounds or five minutes.
 - [x] A failed core produces an explicit failed session rather than fabricated consensus.
 - [x] The server keeps the DeepSeek key and `reasoning_content` out of the stream.
-- [ ] Backend tests and the production frontend build pass.
+- [x] Backend tests and the production frontend build pass.
 
 ## Promotion rule
 
