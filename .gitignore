@@ -1,2 +1,4 @@
 .worktrees/
 .superpowers/
+docs/
+.env.example
