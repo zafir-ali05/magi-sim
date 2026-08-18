@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
-from typing import Any
 
 from .models import Act, ActEvent, CoreId, Motion
 
@@ -61,9 +60,12 @@ def _motion_text(motion: Motion) -> str:
     return f"QUESTION:\n{motion.question}\n\nCONTEXT:\n{context}"
 
 
-def _transcript_text(transcript: str | Sequence[Any]) -> str:
-    if isinstance(transcript, str):
-        return transcript or "(transcript is empty)"
+Transcript = Sequence[Act | ActEvent]
+
+
+def _transcript_text(transcript: Transcript) -> str:
+    if isinstance(transcript, (str, bytes)) or not isinstance(transcript, Sequence):
+        raise ValueError("Transcript must contain only validated public Act or ActEvent objects")
 
     lines: list[str] = []
     for number, item in enumerate(transcript, start=1):
@@ -78,16 +80,8 @@ def _transcript_text(transcript: str | Sequence[Any]) -> str:
                 f"{number}. {item.core} [{item.kind}] {item.content}"
                 + (f" (reply_to={item.reply_to})" if item.reply_to is not None else "")
             )
-        elif isinstance(item, dict):
-            # This path is intentionally limited to public transcript fields.
-            core = item.get("core", "UNKNOWN")
-            kind = item.get("kind", "UNKNOWN")
-            content = item.get("content", "")
-            reply_to = item.get("reply_to")
-            suffix = f" (reply_to={reply_to})" if reply_to is not None else ""
-            lines.append(f"{number}. {core} [{kind}] {content}{suffix}")
         else:
-            lines.append(f"{number}. {item}")
+            raise ValueError("Transcript must contain only validated public Act or ActEvent objects")
     return "\n".join(lines) or "(transcript is empty)"
 
 
@@ -132,7 +126,7 @@ Required output JSON example:
 def reaction_messages(
     core: CoreId,
     motion: Motion,
-    transcript: str | Sequence[Any],
+    transcript: Transcript,
     remaining_rounds: int,
 ) -> list[Message]:
     """Build a reaction request from one numbered, frozen transcript snapshot."""
@@ -160,7 +154,7 @@ Required output JSON example:
 def ballot_messages(
     core: CoreId,
     motion: Motion,
-    transcript: str | Sequence[Any],
+    transcript: Transcript,
 ) -> list[Message]:
     """Build a private ballot request from the final shared transcript."""
 

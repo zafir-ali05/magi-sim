@@ -95,7 +95,11 @@ async def ask_deepseek(
     if not key:
         raise DeepSeekConfigurationError("DEEPSEEK_API_KEY is not configured")
 
-    client = AsyncOpenAI(api_key=key, base_url="https://api.deepseek.com")
+    client = AsyncOpenAI(
+        api_key=key,
+        base_url="https://api.deepseek.com",
+        max_retries=0,
+    )
     usage_totals = {
         "prompt_tokens": 0,
         "completion_tokens": 0,

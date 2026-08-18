@@ -6,6 +6,8 @@ import pytest
 from pydantic import BaseModel
 
 from magi.deepseek import DeepSeekError, ask_deepseek
+from magi.models import Act, ActEvent, Ballot, Motion
+from magi.prompts import ballot_messages, reaction_messages
 
 
 class Probe(BaseModel):
@@ -50,7 +52,11 @@ async def test_request_uses_fixed_thinking_json_configuration(monkeypatch):
             4096,
         )
 
-    factory.assert_called_once_with(api_key="sk-test-secret", base_url="https://api.deepseek.com")
+    factory.assert_called_once_with(
+        api_key="sk-test-secret",
+        base_url="https://api.deepseek.com",
+        max_retries=0,
+    )
     request = client.chat.completions.create.call_args.kwargs
     assert request["model"] == "deepseek-v4-flash"
     assert request["reasoning_effort"] == "high"
@@ -131,3 +137,42 @@ async def test_missing_key_is_checked_when_called(monkeypatch):
             await ask_deepseek("MELCHIOR-1", [], Probe, "high", 4096)
 
     factory.assert_not_called()
+
+
+@pytest.mark.parametrize(
+    "transcript",
+    [
+        [
+            Ballot(
+                core="MELCHIOR-1",
+                vote="AGREE",
+                confidence=0.8,
+                rationale="private ballot",
+            )
+        ],
+        [SimpleNamespace(reasoning_content="private provider response")],
+        "1. MELCHIOR-1 [POSITION] raw transcript text",
+    ],
+)
+def test_prompt_transcripts_reject_private_or_unknown_objects(transcript):
+    motion = Motion(question="Proceed?")
+
+    with pytest.raises(ValueError, match="validated public Act"):
+        ballot_messages("CASPER-3", motion, transcript)
+
+
+def test_prompt_transcripts_number_validated_acts_only():
+    motion = Motion(question="Proceed?")
+    transcript = [
+        Act(core="MELCHIOR-1", kind="POSITION", content="first claim"),
+        ActEvent(
+            id=2,
+            round=1,
+            act=Act(core="BALTHASAR-2", kind="CHALLENGE", content="second claim"),
+        ),
+    ]
+
+    prompt = reaction_messages("CASPER-3", motion, transcript, 2)[1]["content"]
+
+    assert "1. MELCHIOR-1 [POSITION] first claim" in prompt
+    assert "2. BALTHASAR-2 [CHALLENGE] second claim" in prompt
