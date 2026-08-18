@@ -74,6 +74,7 @@ magi-sim/
 │   │   ├── deepseek.py        # direct DeepSeek request function
 │   │   └── deliberation.py    # openings, reaction rounds, ballot, reduction
 │   └── tests/
+│       ├── test_deepseek.py
 │       ├── test_deliberation.py
 │       └── test_api.py
 ├── frontend/
@@ -102,11 +103,12 @@ Five backend modules are enough: contracts, prompts, provider call, orchestratio
 - Create: `backend/src/magi/models.py`
 - Create: `backend/src/magi/prompts.py`
 - Create: `backend/src/magi/deepseek.py`
+- Create: `backend/tests/test_deepseek.py`
 - Create: `.env.example`
 
 **Interfaces:**
 - Produces: `Motion`, `Act`, `Ballot`, `PhaseEvent`, `ActEvent`, `BallotsLockedEvent`, `ResultEvent`, `ErrorEvent`, `StreamEvent`, `CoreId`, `ActKind`, and `Vote`.
-- Produces: `ask_deepseek(messages: list[dict[str, str]], schema: type[T], effort: Literal["high", "max"], max_tokens: int) -> T`.
+- Produces: `ask_deepseek(core: CoreId, messages: list[dict[str, str]], schema: type[T], effort: Literal["high", "max"], max_tokens: int) -> T`.
 - Produces: `opening_messages`, `reaction_messages`, and `ballot_messages` prompt builders.
 
 - [ ] **Step 1: Configure the backend package**
@@ -174,13 +176,21 @@ StreamEvent = PhaseEvent | ActEvent | BallotsLockedEvent | ResultEvent | ErrorEv
 
 Keep the canonical facet separate from the operational lens. Each builder includes the motion, required JSON example, word limit, instruction to address concrete peer claims, and instruction never to reveal hidden reasoning. Reactions receive the numbered frozen transcript and remaining-round count. Ballots receive the final transcript and cannot see peer ballots.
 
-- [ ] **Step 4: Implement one direct provider function**
+- [ ] **Step 4: Write and run focused provider tests first**
 
-Read `DEEPSEEK_API_KEY` directly with `os.environ`; fail at startup with a clear message when it is absent. Construct `AsyncOpenAI(api_key=key, base_url="https://api.deepseek.com")`. Request the fixed `deepseek-v4-flash` model, thinking mode, JSON Object output, the supplied effort, and `max_tokens=4096` for public acts or `8192` for ballots. Parse only `message.content` into `schema`; verify the returned `core` matches the requested identity, account for usage, discard `reasoning_content`, and retry once on provider failure, empty content, truncation, JSON failure, or Pydantic failure.
+Using `unittest.mock` only at the external SDK boundary, verify request construction uses the fixed model, thinking mode, JSON Object output, requested reasoning effort, and token limit. Verify one malformed response is retried, a second failure raises a sanitized error, a mismatched returned core is rejected, and neither the API key nor `reasoning_content` appears in the returned model or exception text.
+
+Run: `cd backend && pytest tests/test_deepseek.py -q`
+
+Expected: failure because `ask_deepseek` does not exist.
+
+- [ ] **Step 5: Implement one direct provider function**
+
+Read `DEEPSEEK_API_KEY` directly with `os.environ`; when the provider function is called without it, raise a clear sanitized configuration error. Construct `AsyncOpenAI(api_key=key, base_url="https://api.deepseek.com")`. Request the fixed `deepseek-v4-flash` model, thinking mode, JSON Object output, the supplied effort, and `max_tokens=4096` for public acts or `8192` for ballots. Parse only `message.content` into `schema`; verify the returned `core` matches the requested identity, account for usage, discard `reasoning_content`, and retry once on provider failure, empty content, truncation, JSON failure, or Pydantic failure.
 
 Do not add a `ModelClient` interface, provider factory, generic plugin system, temperature settings, or provider-managed conversation state.
 
-- [ ] **Step 5: Add environment examples and run import checks**
+- [ ] **Step 6: Add environment examples and run checks**
 
 ```dotenv
 DEEPSEEK_API_KEY=
@@ -190,10 +200,11 @@ Run:
 
 ```bash
 cd backend
+pytest tests/test_deepseek.py -q
 python -c "from magi.models import Motion, Act, Ballot; print(Motion(question='Proceed?'))"
 ```
 
-Expected: a valid `Motion` prints without importing or calling DeepSeek.
+Expected: provider tests pass, and a valid `Motion` prints without importing or calling DeepSeek.
 
 ---
 
