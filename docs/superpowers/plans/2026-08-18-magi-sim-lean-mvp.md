@@ -250,9 +250,9 @@ This barrier is intentional. Do not add inboxes, workers, locks, novelty classif
 
 Freeze the transcript once, request all three ballots concurrently, emit one `ballots_locked` status after all validate, then compute:
 
-- `APPROVED` when at least two ballots are `AGREE` and none of those affirmatives require conditions;
-- `APPROVED_WITH_CONDITIONS` when at least two ballots are `AGREE` or `CONDITIONAL` and at least one is conditional;
-- `REJECTED` otherwise.
+- `REJECTED` when fewer than two ballots are `AGREE` or `CONDITIONAL`;
+- `APPROVED_WITH_CONDITIONS` when at least two ballots are `AGREE` or `CONDITIONAL` and at least one ballot is `CONDITIONAL`;
+- `APPROVED` otherwise, meaning at least two ballots are `AGREE` and no ballot is `CONDITIONAL`.
 
 The `result` event contains all three ballots, deduplicated conditions, and a decision-support disclaimer. Never convert a failed core into `DISAGREE`.
 
