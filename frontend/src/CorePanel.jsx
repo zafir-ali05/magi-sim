@@ -1,3 +1,4 @@
+import React from "react";
 import { motion, useReducedMotion } from "motion/react";
 
 export const CORE_DETAILS = {

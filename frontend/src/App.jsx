@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 
 import { CORE_IDS, parseNdjsonChunk, parseStreamEvent, StreamProtocolError } from "./events.js";
 import { CorePanel } from "./CorePanel.jsx";
