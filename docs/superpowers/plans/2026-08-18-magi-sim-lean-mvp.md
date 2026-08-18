@@ -6,7 +6,7 @@
 
 **Architecture:** One FastAPI process accepts a motion and returns an NDJSON response stream. It runs three independent DeepSeek contexts through independent openings, up to three synchronized reaction rounds, and one simultaneous private-ballot round; a small React client renders those events as a live tri-core console. There is no session repository, replay protocol, provider abstraction, or distributed worker system.
 
-**Tech Stack:** Python 3.12+, FastAPI, Pydantic 2, `asyncio`, OpenAI Python SDK configured for DeepSeek, pytest, React, TypeScript, Vite, Tailwind CSS, Motion for React.
+**Tech Stack:** Python 3.12+, FastAPI, Pydantic 2, `asyncio`, OpenAI Python SDK configured for DeepSeek, pytest, React, JavaScript, Vite, Tailwind CSS, Motion for React.
 
 **Spec:** [`initial-planning.md`](../../initial-planning.md)
 
@@ -79,14 +79,13 @@ magi-sim/
 │       └── test_api.py
 ├── frontend/
 │   ├── package.json
-│   ├── vite.config.ts
-│   ├── tsconfig.json
+│   ├── vite.config.js
 │   └── src/
-│       ├── App.tsx
-│       ├── CorePanel.tsx
-│       ├── types.ts
+│       ├── App.jsx
+│       ├── CorePanel.jsx
+│       ├── events.js
 │       ├── styles.css
-│       └── main.tsx
+│       └── main.jsx
 ├── .env.example
 ├── .gitignore
 └── README.md
@@ -307,13 +306,12 @@ Expected: both test files pass without a real API key or network access.
 
 **Files:**
 - Create: `frontend/package.json`
-- Create: `frontend/vite.config.ts`
-- Create: `frontend/tsconfig.json`
-- Create: `frontend/src/types.ts`
-- Create: `frontend/src/CorePanel.tsx`
-- Create: `frontend/src/App.tsx`
+- Create: `frontend/vite.config.js`
+- Create: `frontend/src/events.js`
+- Create: `frontend/src/CorePanel.jsx`
+- Create: `frontend/src/App.jsx`
 - Create: `frontend/src/styles.css`
-- Create: `frontend/src/main.tsx`
+- Create: `frontend/src/main.jsx`
 
 **Interfaces:**
 - Consumes: the NDJSON event stream from `POST /api/discuss`.
@@ -323,9 +321,9 @@ Expected: both test files pass without a real API key or network access.
 
 Install React, React DOM, Tailwind's Vite plugin, and Motion. Do not install shadcn, Radix, Zod, a state library, a router, an SSE library, or a component test framework.
 
-- [ ] **Step 2: Define the small public event union**
+- [ ] **Step 2: Define the small runtime event validator**
 
-Mirror only `phase`, `act`, `ballots_locked`, `result`, and `error` in `types.ts`. Parse NDJSON lines defensively in `App.tsx`; unknown event types become a visible protocol error rather than modifying state.
+Implement `parseStreamEvent(value)` in `events.js` for only `phase`, `act`, `ballots_locked`, `result`, and `error`. Use explicit object, field, array, and string checks at this network boundary. Parse NDJSON lines defensively in `App.jsx`; malformed values and unknown event types become a visible protocol error rather than modifying state.
 
 - [ ] **Step 3: Implement streaming fetch**
 
@@ -343,11 +341,10 @@ Run:
 
 ```bash
 cd frontend
-npm run typecheck
 npm run build
 ```
 
-Expected: both commands exit successfully. Manually run one fake or real discussion and confirm the UI remains informative during a multi-minute response.
+Expected: the production build exits successfully. Manually run one fake or real discussion and confirm the UI remains informative during a multi-minute response.
 
 ---
 
@@ -372,7 +369,7 @@ Ignore `.env`, virtual environments, Python caches, `node_modules`, and `fronten
 
 ```bash
 cd backend && pytest -q
-cd ../frontend && npm run typecheck && npm run build
+cd ../frontend && npm run build
 ```
 
 Expected: all commands exit successfully. No Docker, Playwright, CI matrix, deployment manifest, or production hosting work belongs in this task.
@@ -390,7 +387,7 @@ Expected: all commands exit successfully. No Docker, Playwright, CI matrix, depl
 - [x] The discussion terminates after three reaction rounds or five minutes.
 - [x] A failed core produces an explicit failed session rather than fabricated consensus.
 - [x] The server keeps the DeepSeek key and `reasoning_content` out of the stream.
-- [ ] Backend tests, frontend type-checking, and the production frontend build pass.
+- [ ] Backend tests and the production frontend build pass.
 
 ## Promotion rule
 

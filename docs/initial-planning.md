@@ -242,9 +242,9 @@ The MVP should be one deployable web application with a small server-side orches
 | **Core runtime** | Three independent `deepseek-v4-flash` contexts with separate prompts and inboxes. Openings and reactive contributions use `high` reasoning effort; final ballots use `max`. |
 | **Streaming API** | Server-Sent Events for one-way session telemetry. Use WebSockets only if users later need to interject during an active discussion. |
 | **Persistence** | In-memory sessions for the first vertical slice; optionally persist completed session summaries later. |
-| **Interface** | React + TypeScript built with Vite, Tailwind CSS, selected shadcn/ui components backed by Radix primitives, and Motion for meaningful state transitions. |
+| **Interface** | React + JavaScript built with Vite, Tailwind CSS, selected shadcn/ui components backed by Radix primitives, and Motion for meaningful state transitions. |
 
-Python `asyncio` with FastAPI remains the backend choice. The frontend uses React, TypeScript, Vite, Tailwind CSS, selected shadcn/Radix primitives, and Motion. The architecture does not require persistent standby workers: create scoped tasks for a session, cancel them at session completion, and keep all session mutation behind the coordinator.
+Python `asyncio` with FastAPI remains the backend choice. The frontend uses React, JavaScript, Vite, Tailwind CSS, selected shadcn/Radix primitives, and Motion. The architecture does not require persistent standby workers: create scoped tasks for a session, cancel them at session completion, and keep all session mutation behind the coordinator.
 
 ### Model and reasoning configuration
 

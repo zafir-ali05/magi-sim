@@ -8,7 +8,7 @@
 
 **Architecture:** A FastAPI coordinator owns an in-memory session state machine, append-only transcript, per-core inboxes, budgets, and deterministic quorum reduction. A React/Vite client starts sessions and consumes an SSE event stream; peers react only to completed semantic messages while presentation deltas are display-only. The production adapter uses DeepSeek V4 Flash through its OpenAI-compatible Chat Completions API behind a provider protocol, while deterministic scripted clients make tests and local UI work independent of paid inference.
 
-**Tech Stack:** Python 3.12+, FastAPI, Pydantic 2, `asyncio`, OpenAI Python SDK configured for DeepSeek's compatible API, DeepSeek V4 Flash, pytest, React, TypeScript, Vite, Tailwind CSS, shadcn/ui with Radix primitives, Motion for React, Vitest, React Testing Library, Playwright, Docker.
+**Tech Stack:** Python 3.12+, FastAPI, Pydantic 2, `asyncio`, OpenAI Python SDK configured for DeepSeek's compatible API, DeepSeek V4 Flash, pytest, React, JavaScript, Vite, Tailwind CSS, shadcn/ui with Radix primitives, Motion for React, Vitest, React Testing Library, Playwright, Docker.
 
 **Spec:** [`initial-planning.md`](../../initial-planning.md)
 
@@ -61,29 +61,28 @@ magi-sim/
 │       └── api/
 ├── frontend/
 │   ├── package.json
-│   ├── vite.config.ts
-│   ├── tsconfig.json
+│   ├── vite.config.js
 │   ├── components.json
 │   ├── src/
-│   │   ├── api/client.ts
-│   │   ├── protocol/types.ts
-│   │   ├── protocol/schemas.ts
-│   │   ├── state/session-reducer.ts
-│   │   ├── components/MotionForm.tsx
-│   │   ├── components/CorePanel.tsx
-│   │   ├── components/DiagnosticTrace.tsx
-│   │   ├── components/BallotReveal.tsx
-│   │   ├── components/ResultSummary.tsx
-│   │   ├── components/SessionControls.tsx
-│   │   ├── App.tsx
-│   │   ├── main.tsx
+│   │   ├── api/client.js
+│   │   ├── protocol/events.js
+│   │   ├── protocol/schemas.js
+│   │   ├── state/session-reducer.js
+│   │   ├── components/MotionForm.jsx
+│   │   ├── components/CorePanel.jsx
+│   │   ├── components/DiagnosticTrace.jsx
+│   │   ├── components/BallotReveal.jsx
+│   │   ├── components/ResultSummary.jsx
+│   │   ├── components/SessionControls.jsx
+│   │   ├── App.jsx
+│   │   ├── main.jsx
 │   │   └── styles.css
 │   └── tests/
-│       ├── session-reducer.test.ts
-│       └── app.test.tsx
+│       ├── session-reducer.test.js
+│       └── app.test.jsx
 ├── e2e/
-│   ├── playwright.config.ts
-│   └── magi-session.spec.ts
+│   ├── playwright.config.js
+│   └── magi-session.spec.js
 ├── .env.example
 ├── .gitignore
 ├── Dockerfile
@@ -102,12 +101,12 @@ magi-sim/
 - Create: `backend/pyproject.toml`
 - Create: `backend/src/magi/domain/models.py`
 - Create: `backend/tests/domain/test_models.py`
-- Create: `frontend/package.json`, `frontend/tsconfig.json`, `frontend/vite.config.ts`
-- Create: `frontend/src/protocol/types.ts`, `frontend/src/protocol/schemas.ts`
+- Create: `frontend/package.json`, `frontend/vite.config.js`
+- Create: `frontend/src/protocol/events.js`, `frontend/src/protocol/schemas.js`
 
 **Interfaces:**
 - Produces: `Motion`, `DiscussionDepth`, `DiscussionEvent`, `AgentAct`, `Ballot`, `SessionResult`, `StreamEnvelope`.
-- Produces: an identical TypeScript discriminated-union representation of public events.
+- Produces: an identical JavaScript event catalog plus Zod runtime validation for public events.
 
 - [ ] **Step 1: Create the Python package and tool configuration**
 
@@ -134,31 +133,32 @@ Expected: FAIL because the contracts do not exist.
 
 Use string enums for core IDs, depth, stakes, quorum, event kind, vote, session phase, and terminal result. Set `extra="forbid"` on public Pydantic models. Enforce question length `1..4000`, message content `1..1200`, confidence `0..1`, and immutable positive event sequence numbers. Model `reply_to` as `int | None`, conditions and risks as bounded lists, and timestamps as UTC datetimes. Define `EvidenceItem` with `id`, `label`, `content`, and `source_type="user_supplied"`; retrieval and URL fetching are outside this MVP.
 
-- [ ] **Step 4: Mirror and runtime-validate the protocol in TypeScript**
+- [ ] **Step 4: Mirror and runtime-validate the protocol in JavaScript**
 
-Use TypeScript discriminated unions plus Zod schemas. `StreamEnvelope` must discriminate at least:
+Export frozen event-name constants from `events.js` and use a Zod discriminated union in `schemas.js`. `StreamEnvelope` must discriminate at least:
 
-```ts
-type StreamEventType =
-  | "session.started"
-  | "core.status"
-  | "message.delta"
-  | "message.committed"
-  | "core.ready"
-  | "transcript.frozen"
-  | "ballot.committed"
-  | "ballots.revealed"
-  | "session.completed"
-  | "session.failed"
-  | "session.cancelled"
-  | "heartbeat";
+```js
+export const STREAM_EVENT_TYPES = Object.freeze([
+  "session.started",
+  "core.status",
+  "message.delta",
+  "message.committed",
+  "core.ready",
+  "transcript.frozen",
+  "ballot.committed",
+  "ballots.revealed",
+  "session.completed",
+  "session.failed",
+  "session.cancelled",
+  "heartbeat",
+]);
 ```
 
 - [ ] **Step 5: Run contract checks**
 
 Run: `cd backend && pytest tests/domain/test_models.py -q && ruff check src tests && mypy src`
 
-Run: `cd frontend && npm run typecheck`
+Run: `cd frontend && npm test -- --run`
 
 Expected: all commands exit 0.
 
@@ -451,11 +451,11 @@ git commit -m "feat: expose MAGI session and SSE API"
 ### Task 8: Scaffold the React visual system and session reducer
 
 **Files:**
-- Modify: `frontend/package.json`, `frontend/vite.config.ts`
+- Modify: `frontend/package.json`, `frontend/vite.config.js`
 - Create: `frontend/components.json`
 - Create: `frontend/src/styles.css`
-- Create: `frontend/src/state/session-reducer.ts`
-- Create: `frontend/tests/session-reducer.test.ts`
+- Create: `frontend/src/state/session-reducer.js`
+- Create: `frontend/tests/session-reducer.test.js`
 
 **Interfaces:**
 - Produces: `reduceSession(state, envelope) -> SessionViewState`.
@@ -479,7 +479,7 @@ Define semantic CSS variables for background, surface, grid, amber activity, gre
 
 - [ ] **Step 5: Run and commit**
 
-Run: `cd frontend && npm run typecheck && npm test -- --run`
+Run: `cd frontend && npm test -- --run && npm run build`
 
 ```bash
 git add frontend
@@ -491,11 +491,11 @@ git commit -m "feat: add MAGI frontend protocol and visual tokens"
 ### Task 9: Build session creation and resilient streaming
 
 **Files:**
-- Create: `frontend/src/api/client.ts`
-- Create: `frontend/src/components/MotionForm.tsx`
-- Create: `frontend/src/components/SessionControls.tsx`
-- Create: `frontend/tests/api-client.test.ts`
-- Create: `frontend/tests/motion-form.test.tsx`
+- Create: `frontend/src/api/client.js`
+- Create: `frontend/src/components/MotionForm.jsx`
+- Create: `frontend/src/components/SessionControls.jsx`
+- Create: `frontend/tests/api-client.test.js`
+- Create: `frontend/tests/motion-form.test.jsx`
 
 **Interfaces:**
 - Produces: `createSession(motion)`, `getSession(id)`, `cancelSession(id)`, and `subscribeToSession(id, handlers)`.
@@ -514,10 +514,10 @@ Provide Cancel during active sessions, Retry for retryable creation failures, an
 
 - [ ] **Step 4: Run and commit**
 
-Run: `cd frontend && npm test -- --run tests/api-client.test.ts tests/motion-form.test.tsx`
+Run: `cd frontend && npm test -- --run tests/api-client.test.js tests/motion-form.test.jsx`
 
 ```bash
-git add frontend/src/api frontend/src/components/MotionForm.tsx frontend/src/components/SessionControls.tsx frontend/tests
+git add frontend/src/api frontend/src/components/MotionForm.jsx frontend/src/components/SessionControls.jsx frontend/tests
 git commit -m "feat: create and stream MAGI sessions"
 ```
 
@@ -526,12 +526,12 @@ git commit -m "feat: create and stream MAGI sessions"
 ### Task 10: Build the live tri-core discussion interface
 
 **Files:**
-- Create: `frontend/src/components/CorePanel.tsx`
-- Create: `frontend/src/components/DiagnosticTrace.tsx`
-- Create: `frontend/src/components/BallotReveal.tsx`
-- Create: `frontend/src/components/ResultSummary.tsx`
-- Create: `frontend/src/App.tsx`, `frontend/src/main.tsx`
-- Create: `frontend/tests/app.test.tsx`
+- Create: `frontend/src/components/CorePanel.jsx`
+- Create: `frontend/src/components/DiagnosticTrace.jsx`
+- Create: `frontend/src/components/BallotReveal.jsx`
+- Create: `frontend/src/components/ResultSummary.jsx`
+- Create: `frontend/src/App.jsx`, `frontend/src/main.jsx`
+- Create: `frontend/tests/app.test.jsx`
 
 **Interfaces:**
 - Consumes: `SessionViewState` only; components do not parse raw SSE.
@@ -563,7 +563,7 @@ Generate short original interface tones with the Web Audio API for message commi
 
 - [ ] **Step 7: Run and commit**
 
-Run: `cd frontend && npm run typecheck && npm test -- --run && npm run build`
+Run: `cd frontend && npm test -- --run && npm run build`
 
 ```bash
 git add frontend/src frontend/tests
@@ -575,7 +575,7 @@ git commit -m "feat: build live MAGI deliberation dashboard"
 ### Task 11: Verify the complete experience in a browser
 
 **Files:**
-- Create: `e2e/package.json`, `e2e/playwright.config.ts`, `e2e/magi-session.spec.ts`
+- Create: `e2e/package.json`, `e2e/playwright.config.js`, `e2e/magi-session.spec.js`
 - Modify: backend test-mode scripted scenario configuration
 
 **Interfaces:**
@@ -636,7 +636,7 @@ README sections must include project purpose, lore/adaptation boundary, architec
 
 ```bash
 cd backend && pytest -q && ruff check src tests && mypy src
-cd ../frontend && npm run typecheck && npm test -- --run && npm run build
+cd ../frontend && npm test -- --run && npm run build
 cd ../e2e && npx playwright test --project=chromium
 cd .. && docker compose config && docker compose build && docker compose up -d
 curl --fail http://localhost:8000/healthz
