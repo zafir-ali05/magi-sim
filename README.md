@@ -133,4 +133,4 @@ THIRD_PARTY_NOTICES.md
 
 The frontend adapts the visual structure and styling of [Tomasz Rewak's MAGI project](https://github.com/TomaszRewak/MAGI), especially the three polygon cores, amber framing, Japanese status headers, state colors, and response window.
 
-Only the frontend presentation was adapted. This project's backend, discussion protocol, prompts, state handling, motion form, and streaming API were written separately. The original access-code flow and API handling remain in the source project. The full attribution and license text are in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+Only the frontend presentation was adapted. This project's backend, discussion protocol, prompts, state handling, motion form, and streaming API were written separately. The original access-code flow and API handling remain in the source project.
