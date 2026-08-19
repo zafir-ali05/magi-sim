@@ -12,16 +12,27 @@ test("provides a complete mixed-ballot discussion for browser verification", () 
     "MELCHIOR-1",
     "BALTHASAR-2",
     "CASPER-3",
+    "CASPER-3",
     "MELCHIOR-1",
     "BALTHASAR-2",
-    "CASPER-3",
   ]);
   assert.deepEqual(
     acts.map((event) => event.seen_through_event_id),
-    [0, 0, 0, 3, 3, 5],
+    [0, 0, 0, 3, 4, 5],
   );
   assert.equal(acts.some((event) => "round" in event), false);
   assert.equal(events.some((event) => event.type === "core_status"), true);
+  const speakingStatuses = events
+    .filter((event) => event.type === "core_status" && event.status === "SPEAKING")
+    .map((event) => event.core);
+  assert.deepEqual(speakingStatuses, [
+    "MELCHIOR-1",
+    "BALTHASAR-2",
+    "CASPER-3",
+    "CASPER-3",
+    "MELCHIOR-1",
+    "BALTHASAR-2",
+  ]);
   assert.equal(events.at(-2).type, "ballots_locked");
   assert.equal(events.at(-1).quorum, "majority");
   assert.equal(events.at(-1).recommendation, "APPROVED_WITH_CONDITIONS");

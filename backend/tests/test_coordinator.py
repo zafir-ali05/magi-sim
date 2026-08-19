@@ -155,6 +155,33 @@ async def test_openings_commit_atomically_in_core_order_after_all_finish():
     assert all("SHARED REVIEW RECORD" not in prompt for prompt in fake.opening_prompts.values())
     assert {versions[0] for versions in fake.reaction_versions.values()} == {3}
 
+    discussion_phase_index = next(
+        index
+        for index, event in enumerate(events)
+        if event.type == "phase" and event.phase == "DISCUSSION"
+    )
+    pre_discussion = events[:discussion_phase_index]
+    for core in CORE_ORDER:
+        assert any(
+            event.type == "core_status"
+            and event.core == core
+            and event.status == "THINKING"
+            for event in pre_discussion
+        )
+        speaking_index = next(
+            index
+            for index, event in enumerate(pre_discussion)
+            if event.type == "core_status"
+            and event.core == core
+            and event.status == "SPEAKING"
+        )
+        opening_index = next(
+            index
+            for index, event in enumerate(pre_discussion)
+            if event.type == "act" and event.act.core == core
+        )
+        assert speaking_index < opening_index
+
 
 @pytest.mark.asyncio
 async def test_invalid_opening_kind_exposes_no_partial_opening_snapshot():
@@ -171,7 +198,15 @@ async def test_invalid_opening_kind_exposes_no_partial_opening_snapshot():
         ):
             events.append(event)
 
-    assert [event.type for event in events] == ["phase"]
+    assert [event.type for event in events] == [
+        "phase",
+        "core_status",
+        "core_status",
+        "core_status",
+    ]
+    assert [event.core for event in events[1:]] == list(CORE_ORDER)
+    assert all(event.status == "THINKING" for event in events[1:])
+    assert not any(event.type == "act" for event in events)
 
 
 @pytest.mark.asyncio
@@ -195,6 +230,23 @@ async def test_pass_ready_and_optional_public_act_are_independent_review_outcome
     assert public_acts[3].seen_through_event_id == 3
     assert all(event.act.kind not in {"PASS", "READY"} for event in public_acts)
     assert any(event.type == "result" for event in events)
+
+    statuses = [event for event in events if event.type == "core_status"]
+    for core in CORE_ORDER:
+        assert any(event.core == core and event.status == "THINKING" for event in statuses)
+    casper_speaking_index = next(
+        index
+        for index, event in enumerate(events)
+        if event.type == "core_status"
+        and event.core == "CASPER-3"
+        and event.status == "SPEAKING"
+    )
+    casper_act_index = next(
+        index
+        for index, event in enumerate(events)
+        if event.type == "act" and event.id == 4
+    )
+    assert casper_speaking_index < casper_act_index
 
 
 @pytest.mark.asyncio

@@ -23,6 +23,24 @@ const CORE_STATES = Object.freeze({
     japanese: "情 報",
     flicker: false,
   }),
+  thinking: Object.freeze({
+    key: "thinking",
+    english: "ANALYZING",
+    japanese: "解 析",
+    flicker: false,
+  }),
+  ready: Object.freeze({
+    key: "ready",
+    english: "READY",
+    japanese: "待 機",
+    flicker: false,
+  }),
+  bounded: Object.freeze({
+    key: "bounded",
+    english: "REVIEW BOUNDED",
+    japanese: "限 界",
+    flicker: false,
+  }),
   locked: Object.freeze({
     key: "locked",
     english: "VOTE SEALED",
@@ -69,6 +87,8 @@ const OUTCOME_STATES = Object.freeze({
   APPROVED: "agree",
   APPROVED_WITH_CONDITIONS: "conditional",
   REJECTED: "disagree",
+  HUMAN_CONFIRMATION_REQUIRED: "conditional",
+  INCOMPLETE: "error",
 });
 
 function copyState(state) {
@@ -81,6 +101,7 @@ export function getCoreVisualState({
   sessionStatus = "idle",
   activeCores = [],
   speakingCore = null,
+  coreStatus = null,
   ballot = null,
   ballotsLocked = false,
 } = {}) {
@@ -96,7 +117,17 @@ export function getCoreVisualState({
   }
 
   if (sessionStatus === "running" && ["OPENING", "DISCUSSION"].includes(phase)) {
-    return copyState(core === speakingCore ? CORE_STATES.processing : CORE_STATES.listening);
+    if (core === speakingCore) return copyState(CORE_STATES.processing);
+
+    const statusState = {
+      THINKING: CORE_STATES.thinking,
+      LISTENING: CORE_STATES.listening,
+      SPEAKING: CORE_STATES.listening,
+      READY: CORE_STATES.ready,
+      BUDGET_EXHAUSTED: CORE_STATES.bounded,
+      FAILED: CORE_STATES.error,
+    }[coreStatus?.status];
+    return copyState(statusState ?? CORE_STATES.listening);
   }
 
   return copyState(CORE_STATES.information);
@@ -146,6 +177,7 @@ export function buildCoreDialogModel({
   sessionStatus = "idle",
   activeCores = [],
   speakingCore = null,
+  coreStatus = null,
   acts = [],
   ballot = null,
   ballotsLocked = false,
@@ -157,6 +189,7 @@ export function buildCoreDialogModel({
     sessionStatus,
     activeCores,
     speakingCore,
+    coreStatus,
     acts,
     ballot,
     ballotsLocked,

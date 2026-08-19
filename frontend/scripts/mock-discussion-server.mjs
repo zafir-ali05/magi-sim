@@ -5,6 +5,18 @@ const CORES = ["MELCHIOR-1", "BALTHASAR-2", "CASPER-3"];
 
 const COMPLETE_DISCUSSION = [
   { type: "phase", phase: "OPENING", active_cores: CORES },
+  ...CORES.map((core) => ({
+    type: "core_status",
+    core,
+    status: "THINKING",
+    reviewed_through_event_id: 0,
+  })),
+  {
+    type: "core_status",
+    core: "MELCHIOR-1",
+    status: "SPEAKING",
+    reviewed_through_event_id: 0,
+  },
   {
     type: "act",
     id: 1,
@@ -17,6 +29,12 @@ const COMPLETE_DISCUSSION = [
     },
   },
   {
+    type: "core_status",
+    core: "BALTHASAR-2",
+    status: "SPEAKING",
+    reviewed_through_event_id: 0,
+  },
+  {
     type: "act",
     id: 2,
     seen_through_event_id: 0,
@@ -26,6 +44,12 @@ const COMPLETE_DISCUSSION = [
       content: "The affected group needs advance notice and a clear route to request review.",
       reply_to: null,
     },
+  },
+  {
+    type: "core_status",
+    core: "CASPER-3",
+    status: "SPEAKING",
+    reviewed_through_event_id: 0,
   },
   {
     type: "act",
@@ -46,38 +70,86 @@ const COMPLETE_DISCUSSION = [
     reviewed_through_event_id: 3,
   },
   {
+    type: "core_status",
+    core: "MELCHIOR-1",
+    status: "THINKING",
+    reviewed_through_event_id: 3,
+  },
+  {
+    type: "core_status",
+    core: "BALTHASAR-2",
+    status: "THINKING",
+    reviewed_through_event_id: 3,
+  },
+  {
+    type: "core_status",
+    core: "CASPER-3",
+    status: "SPEAKING",
+    reviewed_through_event_id: 3,
+  },
+  {
     type: "act",
     id: 4,
     seen_through_event_id: 3,
     act: {
-      core: "MELCHIOR-1",
-      kind: "RESPONSE",
-      content: "Limit the trial to one cycle and require a measurable rollback threshold.",
-      reply_to: 3,
+      core: "CASPER-3",
+      kind: "CHALLENGE",
+      content: "The stated safeguards do not remove the incentive to expand the trial prematurely.",
+      reply_to: 1,
     },
+  },
+  {
+    type: "core_status",
+    core: "MELCHIOR-1",
+    status: "THINKING",
+    reviewed_through_event_id: 4,
+  },
+  {
+    type: "core_status",
+    core: "MELCHIOR-1",
+    status: "SPEAKING",
+    reviewed_through_event_id: 4,
   },
   {
     type: "act",
     id: 5,
-    seen_through_event_id: 3,
+    seen_through_event_id: 4,
     act: {
-      core: "BALTHASAR-2",
-      kind: "PROPOSE_CONDITION",
-      content: "Publish the review and retain a human appeal path throughout the trial.",
-      reply_to: 1,
+      core: "MELCHIOR-1",
+      kind: "RESPONSE",
+      content: "Limit the trial to one cycle and require a measurable rollback threshold.",
+      reply_to: 4,
     },
+  },
+  {
+    type: "core_status",
+    core: "BALTHASAR-2",
+    status: "THINKING",
+    reviewed_through_event_id: 5,
+  },
+  {
+    type: "core_status",
+    core: "BALTHASAR-2",
+    status: "SPEAKING",
+    reviewed_through_event_id: 5,
   },
   {
     type: "act",
     id: 6,
     seen_through_event_id: 5,
     act: {
-      core: "CASPER-3",
-      kind: "CLARIFY",
-      content: "The new conditions clarify the risk, but I still oppose proceeding now.",
+      core: "BALTHASAR-2",
+      kind: "PROPOSE_CONDITION",
+      content: "Publish the review and retain a human appeal path throughout the trial.",
       reply_to: 5,
     },
   },
+  ...CORES.map((core) => ({
+    type: "core_status",
+    core,
+    status: "READY",
+    reviewed_through_event_id: 6,
+  })),
   { type: "phase", phase: "BALLOTING", active_cores: [] },
   { type: "ballots_locked" },
   {

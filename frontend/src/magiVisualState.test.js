@@ -19,6 +19,7 @@ function coreState(overrides = {}) {
     ballot: null,
     ballotsLocked: false,
     speakingCore: null,
+    coreStatus: { status: "LISTENING", reviewedThroughEventId: 0 },
     ...overrides,
   };
 }
@@ -64,6 +65,37 @@ test("maps only the current public speaker to processing during discussion", () 
     ),
     { key: "listening", english: "LISTENING", japanese: "情 報", flicker: false },
   );
+});
+
+test("maps backend review statuses without treating readiness as agreement", () => {
+  const cases = [
+    ["THINKING", "thinking", "ANALYZING"],
+    ["LISTENING", "listening", "LISTENING"],
+    ["READY", "ready", "READY"],
+    ["BUDGET_EXHAUSTED", "bounded", "REVIEW BOUNDED"],
+    ["FAILED", "error", "ERROR"],
+  ];
+
+  for (const [status, key, english] of cases) {
+    const state = getCoreVisualState(
+      coreState({
+        phase: "DISCUSSION",
+        sessionStatus: "running",
+        coreStatus: { status, reviewedThroughEventId: 4 },
+      }),
+    );
+    assert.equal(state.key, key);
+    assert.equal(state.english, english);
+  }
+
+  const ready = getCoreVisualState(
+    coreState({
+      phase: "DISCUSSION",
+      sessionStatus: "running",
+      coreStatus: { status: "READY", reviewedThroughEventId: 4 },
+    }),
+  );
+  assert.notEqual(ready.key, "agree");
 });
 
 test("keeps locked ballots concealed behind the processing information state", () => {
@@ -126,6 +158,11 @@ test("maps the system indicator from phase and final outcome", () => {
     "conditional",
   );
   assert.equal(getSystemVisualState({ result: { outcome: "REJECTED" } }).key, "disagree");
+  assert.equal(
+    getSystemVisualState({ result: { outcome: "HUMAN_CONFIRMATION_REQUIRED" } }).key,
+    "conditional",
+  );
+  assert.equal(getSystemVisualState({ result: { outcome: "INCOMPLETE" } }).key, "error");
   assert.equal(getSystemVisualState({ phase: "FAILED", sessionStatus: "error" }).key, "error");
 });
 

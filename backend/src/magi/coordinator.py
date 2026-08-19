@@ -103,6 +103,12 @@ class ReactiveCoordinator:
         try:
             self.session.begin_opening()
             yield PhaseEvent(phase="OPENING", active_cores=list(CORE_ORDER))
+            for core in CORE_ORDER:
+                yield CoreStatusEvent(
+                    core=core,
+                    status="THINKING",
+                    reviewed_through_event_id=0,
+                )
             openings = await self._openings(motion)
 
             self.budgets = BudgetLedger(self.limits)
@@ -121,6 +127,11 @@ class ReactiveCoordinator:
                 raise CoordinatorFailure from None
             self.transcript = staged_transcript
             for event in opening_events:
+                yield CoreStatusEvent(
+                    core=event.act.core,
+                    status="SPEAKING",
+                    reviewed_through_event_id=0,
+                )
                 yield event
 
             self.session.begin_discussion(latest_event_id=self.transcript.version)
@@ -314,6 +325,7 @@ class ReactiveCoordinator:
                 snapshot = self.transcript.snapshot()
                 last_reviewed = state.reviewed_through_event_id
                 self.session.mark_in_flight(core, True)
+                self._emit_status(core, "THINKING")
                 self._changed.set()
                 try:
                     generation = await _request(
@@ -384,6 +396,7 @@ class ReactiveCoordinator:
             event = self.transcript.append(act, seen_through_event_id=seen_version)
             if event.id == seen_version + 1:
                 self.session.mark_reviewed(core, event.id)
+            self._emit_status(core, "SPEAKING")
             self._emit(event)
             self.session.revoke_peer_readiness(sender=core)
             for peer in CORE_ORDER:
@@ -421,7 +434,14 @@ class ReactiveCoordinator:
     def _emit_status(
         self,
         core: CoreId,
-        status: Literal["LISTENING", "READY", "BUDGET_EXHAUSTED", "FAILED"],
+        status: Literal[
+            "LISTENING",
+            "THINKING",
+            "SPEAKING",
+            "READY",
+            "BUDGET_EXHAUSTED",
+            "FAILED",
+        ],
     ) -> None:
         self._emit(
             CoreStatusEvent(

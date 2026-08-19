@@ -24,6 +24,7 @@ function renderArray(overrides = {}) {
       phase: "STANDBY",
       sessionStatus: "idle",
       activeCores: [],
+      coreStatuses: {},
       acts: [],
       ballots: null,
       ballotsLocked: false,
@@ -94,6 +95,23 @@ test("illuminates only the core whose public discussion act is being presented",
   assert.doesNotMatch(html, /magi-system__core--flicker/);
 });
 
+test("renders backend core review states without using approval colors for ready", () => {
+  const html = renderArray({
+    phase: "DISCUSSION",
+    sessionStatus: "running",
+    coreStatuses: {
+      "MELCHIOR-1": { status: "THINKING", reviewedThroughEventId: 3 },
+      "BALTHASAR-2": { status: "READY", reviewedThroughEventId: 4 },
+      "CASPER-3": { status: "BUDGET_EXHAUSTED", reviewedThroughEventId: 4 },
+    },
+  });
+
+  assert.match(html, /magi-system__core--melchior[^"\n]*magi-system__core--thinking/);
+  assert.match(html, /magi-system__core--balthasar[^"\n]*magi-system__core--ready/);
+  assert.match(html, /magi-system__core--casper[^"\n]*magi-system__core--bounded/);
+  assert.doesNotMatch(html, /magi-system__core--agree/);
+});
+
 test("renders the reference modal fields and an accessible close control", () => {
   const html = renderToStaticMarkup(
     React.createElement(CoreResponseDialog, {
@@ -129,4 +147,8 @@ test("uses the reference MAGI array as the application's core display", () => {
   assert.doesNotMatch(html, /class="core-grid"/);
   assert.match(html, /LATEST VERSION/);
   assert.doesNotMatch(html, /REMAINING REACTION ROUNDS/);
+  assert.match(html, /DECISION POLICY/);
+  assert.match(html, /value="majority" selected=""/);
+  assert.match(html, /value="unanimous"/);
+  assert.match(html, /value="human_confirm"/);
 });

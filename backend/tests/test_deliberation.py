@@ -153,5 +153,14 @@ async def test_opening_failure_is_sanitized_and_commits_no_partial_snapshot():
         )
     ]
 
-    assert [event.type for event in events] == ["phase", "error"]
+    assert [event.type for event in events] == [
+        "phase",
+        "core_status",
+        "core_status",
+        "core_status",
+        "error",
+    ]
+    assert [event.core for event in events[1:4]] == list(CORE_ORDER)
+    assert all(event.status == "THINKING" for event in events[1:4])
+    assert not any(event.type == "act" for event in events)
     assert secret not in events[-1].message

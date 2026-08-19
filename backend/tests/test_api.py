@@ -13,6 +13,16 @@ def test_discuss_streams_ordered_compact_ndjson_without_private_values(monkeypat
 
     events = [
         PhaseEvent(phase="OPENING", active_cores=["MELCHIOR-1"]),
+        CoreStatusEvent(
+            core="MELCHIOR-1",
+            status="THINKING",
+            reviewed_through_event_id=0,
+        ),
+        CoreStatusEvent(
+            core="MELCHIOR-1",
+            status="SPEAKING",
+            reviewed_through_event_id=0,
+        ),
         ActEvent(
             id=1,
             seen_through_event_id=0,
@@ -48,6 +58,8 @@ def test_discuss_streams_ordered_compact_ndjson_without_private_values(monkeypat
     payloads = [json.loads(line) for line in lines]
     assert [payload["type"] for payload in payloads] == [
         "phase",
+        "core_status",
+        "core_status",
         "act",
         "core_status",
         "phase",
@@ -57,6 +69,12 @@ def test_discuss_streams_ordered_compact_ndjson_without_private_values(monkeypat
         "BALLOTING",
     ]
     assert all(line == line.strip() for line in lines)
+    status_payloads = [payload for payload in payloads if payload["type"] == "core_status"]
+    assert [payload["status"] for payload in status_payloads] == [
+        "THINKING",
+        "SPEAKING",
+        "LISTENING",
+    ]
     act_payload = next(payload for payload in payloads if payload["type"] == "act")
     assert act_payload["seen_through_event_id"] == 0
     assert "round" not in act_payload

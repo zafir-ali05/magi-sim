@@ -4,7 +4,11 @@ import { CORE_IDS, parseNdjsonChunk, parseStreamEvent, StreamProtocolError } fro
 import { CoreResponseDialog } from "./CoreResponseDialog.jsx";
 import { MagiCoreArray } from "./MagiCoreArray.jsx";
 import { buildCoreDialogModel } from "./magiVisualState.js";
-import { createSession } from "./session.js";
+import {
+  advanceSpeakerPresentation,
+  applyStreamEvent,
+  createSession,
+} from "./session.js";
 
 const SPEAKER_CUE_MS = 1000;
 
@@ -35,9 +39,9 @@ function isRunning(status) {
 export default function App() {
   const [question, setQuestion] = useState("");
   const [context, setContext] = useState("");
+  const [quorum, setQuorum] = useState("majority");
   const [submittedQuestion, setSubmittedQuestion] = useState("");
   const [selectedCore, setSelectedCore] = useState(null);
-  const [speakingCore, setSpeakingCore] = useState(null);
   const [session, setSession] = useState(() => createSession());
   const controllerRef = useRef(null);
   const requestIdRef = useRef(0);
@@ -56,6 +60,15 @@ export default function App() {
     return () => window.clearInterval(interval);
   }, [session.startedAt, session.status]);
 
+  useEffect(() => {
+    if (!session.speakingCore) return undefined;
+
+    const timer = window.setTimeout(() => {
+      setSession((current) => advanceSpeakerPresentation(current));
+    }, SPEAKER_CUE_MS);
+    return () => window.clearTimeout(timer);
+  }, [session.speakingCore]);
+
   useEffect(
     () => () => {
       requestIdRef.current += 1;
@@ -65,51 +78,7 @@ export default function App() {
   );
 
   const applyEvent = (event) => {
-    setSession((current) => {
-      switch (event.type) {
-        case "phase":
-          return {
-            ...current,
-            status: "running",
-            phase: event.phase,
-            activeCores: event.active_cores,
-          };
-        case "act":
-          return {
-            ...current,
-            status: "running",
-            acts: [...current.acts, event],
-          };
-        case "ballots_locked":
-          return {
-            ...current,
-            status: "running",
-            phase: "BALLOTING",
-            ballotsLocked: true,
-          };
-        case "result":
-          return {
-            ...current,
-            status: "complete",
-            phase: "COMPLETE",
-            activeCores: [],
-            ballotsLocked: true,
-            ballots: event.ballots,
-            result: event,
-            error: "",
-          };
-        case "error":
-          return {
-            ...current,
-            status: "error",
-            phase: "FAILED",
-            activeCores: [],
-            error: event.message,
-          };
-        default:
-          return current;
-      }
-    });
+    setSession((current) => applyStreamEvent(current, event));
   };
 
   const handleStartOver = () => {
@@ -118,9 +87,9 @@ export default function App() {
     controllerRef.current = null;
     setQuestion("");
     setContext("");
+    setQuorum("majority");
     setSubmittedQuestion("");
     setSelectedCore(null);
-    setSpeakingCore(null);
     setSession(createSession());
   };
 
@@ -134,14 +103,13 @@ export default function App() {
     const controller = new AbortController();
     controllerRef.current = controller;
     const startedAt = Date.now();
-    const motion = { question: question.trim(), context: context.trim() };
+    const motion = { question: question.trim(), context: context.trim(), quorum };
     setSubmittedQuestion(motion.question);
     setSelectedCore(null);
-    setSpeakingCore(null);
     setSession(createSession(startedAt));
 
     let terminalEventSeen = false;
-    const processLine = async (line) => {
+    const processLine = (line) => {
       if (requestId !== requestIdRef.current) return;
       if (!line.trim()) return;
       let value;
@@ -153,15 +121,6 @@ export default function App() {
       const parsed = parseStreamEvent(value);
       if (parsed.type === "result" || parsed.type === "error") terminalEventSeen = true;
 
-      if (parsed.type === "act") {
-        setSpeakingCore(parsed.act.core);
-        applyEvent(parsed);
-        await new Promise((resolve) => window.setTimeout(resolve, SPEAKER_CUE_MS));
-        if (requestId === requestIdRef.current) setSpeakingCore(null);
-        return;
-      }
-
-      if (parsed.type === "result" || parsed.type === "error") setSpeakingCore(null);
       applyEvent(parsed);
     };
 
@@ -180,23 +139,21 @@ export default function App() {
       for await (const chunk of decoded) {
         const parsedChunk = parseNdjsonChunk(remainder, chunk);
         remainder = parsedChunk.remainder;
-        for (const line of parsedChunk.lines) await processLine(line);
+        for (const line of parsedChunk.lines) processLine(line);
       }
-      if (remainder.trim()) await processLine(remainder);
+      if (remainder.trim()) processLine(remainder);
       if (!terminalEventSeen) {
         throw new StreamProtocolError("the stream ended before a final result.");
       }
     } catch (error) {
       if (requestId !== requestIdRef.current || error?.name === "AbortError") return;
       const message = protocolMessage(error);
-      setSpeakingCore(null);
-      setSession((current) => ({
-        ...current,
-        status: "error",
-        phase: "FAILED",
-        activeCores: [],
-        error: message || "Connection closed.",
-      }));
+      setSession((current) =>
+        applyStreamEvent(current, {
+          type: "error",
+          message: message || "Connection closed.",
+        }),
+      );
       controller.abort();
     } finally {
       if (requestId === requestIdRef.current) controllerRef.current = null;
@@ -216,7 +173,8 @@ export default function App() {
         phase: session.phase,
         sessionStatus: session.status,
         activeCores: session.activeCores,
-        speakingCore,
+        speakingCore: session.speakingCore,
+        coreStatus: session.coreStatuses[selectedCore],
         acts: session.acts,
         ballot: selectedBallot,
         ballotsLocked: session.ballotsLocked,
@@ -280,6 +238,23 @@ export default function App() {
                 disabled={isRunning(session.status)}
                 rows={3}
               />
+            </label>
+            <label className="motion-policy" htmlFor="motion-quorum">
+              <span className="field-label">DECISION POLICY</span>
+              <select
+                id="motion-quorum"
+                name="quorum"
+                value={quorum}
+                onChange={(event) => setQuorum(event.target.value)}
+                disabled={isRunning(session.status)}
+              >
+                <option value="majority">MAJORITY</option>
+                <option value="unanimous">UNANIMOUS</option>
+                <option value="human_confirm">HUMAN CONFIRMATION</option>
+              </select>
+              <span className="field-help">
+                Select explicitly; the system never infers stakes from the motion text.
+              </span>
             </label>
             <div className="form-actions">
               <button type="submit" disabled={isRunning(session.status)}>
@@ -351,7 +326,8 @@ export default function App() {
             phase={session.phase}
             sessionStatus={session.status}
             activeCores={session.activeCores}
-            speakingCore={speakingCore}
+            coreStatuses={session.coreStatuses}
+            speakingCore={session.speakingCore}
             acts={session.acts}
             ballots={session.result ? session.ballots : null}
             ballotsLocked={session.ballotsLocked}
@@ -409,6 +385,20 @@ export default function App() {
                 <span>{outcomeLabel(session.result.outcome)}</span>
               </div>
             </div>
+            <dl className="result-policy" aria-label="Decision policy result">
+              <div>
+                <dt>POLICY</dt>
+                <dd>{outcomeLabel(session.result.quorum)}</dd>
+              </div>
+              <div>
+                <dt>RECOMMENDATION</dt>
+                <dd>{outcomeLabel(session.result.recommendation)}</dd>
+              </div>
+              <div>
+                <dt>HUMAN CONFIRMATION</dt>
+                <dd>{session.result.requires_human_confirmation ? "REQUIRED" : "NOT REQUIRED"}</dd>
+              </div>
+            </dl>
             {session.result.conditions.length > 0 ? (
               <div className="result-conditions">
                 <span className="field-label">AGGREGATED CONDITIONS</span>
