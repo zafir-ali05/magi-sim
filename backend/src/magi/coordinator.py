@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import Any, Literal, TypeVar, cast
+from typing import Literal, TypeVar, cast
 
 from .budgets import BudgetLedger, DiscussionLimits
 from .models import (
@@ -18,7 +18,6 @@ from .models import (
     ReviewDecision,
     ResultEvent,
     StreamEvent,
-    TokenUsage,
 )
 from .policy import reduce_ballots
 from .prompts import ballot_messages, opening_messages, reaction_messages
@@ -40,35 +39,6 @@ Ask = Callable[
 
 class CoordinatorFailure(Exception):
     """Sanitized internal marker for provider or public-model failures."""
-
-
-def _validated(value: Any, schema: type[T], core: CoreId) -> T:
-    try:
-        result = schema.model_validate(value)
-    except Exception:
-        raise CoordinatorFailure from None
-    if result.core != core:
-        raise CoordinatorFailure
-    return result
-
-
-async def _request(
-    ask: Ask,
-    core: CoreId,
-    messages: list[dict[str, str]],
-    schema: type[T],
-    effort: Literal["high", "max"],
-    max_tokens: int,
-) -> Generation[T]:
-    try:
-        generation = await ask(core, messages, schema, effort, max_tokens)
-    except asyncio.CancelledError:
-        raise
-    except Exception:
-        raise CoordinatorFailure from None
-    if not isinstance(generation, Generation) or not isinstance(generation.usage, TokenUsage):
-        raise CoordinatorFailure
-    return Generation(_validated(generation.value, schema, core), generation.usage)
 
 
 class ReactiveCoordinator:
@@ -114,6 +84,7 @@ class ReactiveCoordinator:
                 )
             openings = await self._openings(motion)
 
+            # get all three openings first so nobody gets to react early
             self.budgets = BudgetLedger(self.limits)
             for generation in openings:
                 self.budgets.record_usage(generation.usage)
@@ -137,7 +108,7 @@ class ReactiveCoordinator:
                 )
                 yield event
 
-            self.session.begin_discussion(latest_event_id=self.transcript.version)
+            self.session.begin_discussion()
             yield PhaseEvent(phase="DISCUSSION", active_cores=list(CORE_ORDER))
             self._deadline_task = asyncio.create_task(self._discussion_deadline())
 
@@ -185,11 +156,11 @@ class ReactiveCoordinator:
             frozen = self.transcript.freeze()
             ballots_by_core: dict[CoreId, Generation[Ballot]] = {}
             pending_cores = list(CORE_ORDER)
+            # failed ballots get one full retry round
             for _ in range(BALLOT_REQUEST_ROUNDS):
                 round_results = await asyncio.gather(
                     *(
-                        _request(
-                            self.ask,
+                        self.ask(
                             core,
                             ballot_messages(core, motion, frozen.events),
                             Ballot,
@@ -253,8 +224,7 @@ class ReactiveCoordinator:
     async def _openings(self, motion: Motion) -> list[Generation[Act]]:
         tasks = [
             asyncio.create_task(
-                _request(
-                    self.ask,
+                self.ask(
                     core,
                     opening_messages(core, motion),
                     Act,
@@ -319,6 +289,7 @@ class ReactiveCoordinator:
                         return
                     versions.append(first)
                     consumed = 1
+                    # fold quick transcript updates into one review call
                     await asyncio.sleep(self.review_debounce_seconds)
                     while not self.inboxes[core].empty():
                         versions.append(self.inboxes[core].get_nowait())
@@ -341,8 +312,7 @@ class ReactiveCoordinator:
                 self._emit_status(core, "THINKING")
                 self._changed.set()
                 try:
-                    generation = await _request(
-                        self.ask,
+                    generation = await self.ask(
                         core,
                         reaction_messages(
                             core,
@@ -424,6 +394,7 @@ class ReactiveCoordinator:
                 self.session.mark_reviewed(core, event.id)
             self._emit_status(core, "SPEAKING")
             self._emit(event)
+            # a new public act makes the old READY states stale
             self.session.revoke_peer_readiness(sender=core)
             for peer in CORE_ORDER:
                 if peer != core:

@@ -9,8 +9,7 @@ from .transcript import FrozenTranscript
 Message = dict[str, str]
 
 
-# The canonical facet is lore; the operational lens is an explicit product
-# interpretation and is kept in its own field so the two are not conflated.
+# the anime gives us the facets, everything else here is my interpretation
 CORE_IDENTITIES: dict[CoreId, dict[str, str]] = {
     "MELCHIOR-1": {
         "canonical_facet": "scientist",
@@ -141,13 +140,6 @@ For PUBLISH, kind must be CHALLENGE, RESPONSE, CONCEDE, PROPOSE_CONDITION, or CL
 POSITION is not a valid review publication kind. Never write READY or PASS inside content.'''
 
 
-def _identity(core: CoreId) -> dict[str, str]:
-    try:
-        return CORE_IDENTITIES[core]
-    except KeyError:
-        raise ValueError(f"Unknown MAGI core: {core}") from None
-
-
 def _motion_text(motion: Motion) -> str:
     context = motion.context or "(no additional context)"
     return f"QUESTION:\n{motion.question}\n\nCONTEXT:\n{context}"
@@ -157,6 +149,7 @@ Transcript = Sequence[Act | ActEvent]
 
 
 def _transcript_text(transcript: Transcript) -> str:
+    # keep private provider stuff out of prompts even if a caller messes up
     if isinstance(transcript, (str, bytes)) or not isinstance(transcript, Sequence):
         raise ValueError("Transcript must contain only validated public Act or ActEvent objects")
 
@@ -164,17 +157,16 @@ def _transcript_text(transcript: Transcript) -> str:
     for number, item in enumerate(transcript, start=1):
         if isinstance(item, ActEvent):
             act = item.act
-            lines.append(
-                f"{item.id}. {act.core} [{act.kind}] {act.content}"
-                + (f" (reply_to={act.reply_to})" if act.reply_to is not None else "")
-            )
+            event_id = item.id
         elif isinstance(item, Act):
-            lines.append(
-                f"{number}. {item.core} [{item.kind}] {item.content}"
-                + (f" (reply_to={item.reply_to})" if item.reply_to is not None else "")
-            )
+            act = item
+            event_id = number
         else:
             raise ValueError("Transcript must contain only validated public Act or ActEvent objects")
+        lines.append(
+            f"{event_id}. {act.core} [{act.kind}] {act.content}"
+            + (f" (reply_to={act.reply_to})" if act.reply_to is not None else "")
+        )
     return "\n".join(lines) or "(transcript is empty)"
 
 
@@ -191,7 +183,7 @@ Return exactly one valid JSON object matching one allowed shape below and no mar
 
 
 def _system_prompt(core: CoreId, *, response_contract: str) -> str:
-    identity = _identity(core)
+    identity = CORE_IDENTITIES[core]
     return f"""MAGI CORE: {core}
 Canonical facet: {identity['canonical_facet']}
 Operational lens: {identity['operational_lens']}
@@ -231,8 +223,6 @@ def reaction_messages(
 ) -> list[Message]:
     """Build an independent review request from one frozen shared snapshot."""
 
-    if not 0 <= last_reviewed_event_id <= transcript.version:
-        raise ValueError("last_reviewed_event_id must be within the transcript snapshot")
     newly_visible = (
         f"{last_reviewed_event_id + 1}..{transcript.version}"
         if last_reviewed_event_id < transcript.version

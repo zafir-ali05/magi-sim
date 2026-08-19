@@ -58,6 +58,7 @@ T = TypeVar("T", bound=BaseModel)
 
 @dataclass(frozen=True)
 class TokenUsage:
+    # reasoning text gets dropped, but its token count still matters for the budget
     prompt_tokens: int
     completion_tokens: int
     reasoning_tokens: int
@@ -79,6 +80,7 @@ class Generation(Generic[T]):
 
 
 class _PublicModel(BaseModel):
+    # reject extra fields from both the API and the model
     model_config = ConfigDict(extra="forbid")
 
 
@@ -104,6 +106,7 @@ class ReviewDecision(_PublicModel):
 
     @model_validator(mode="after")
     def validate_action_shape(self) -> ReviewDecision:
+        # PUBLISH is public, READY and PASS are only worker controls
         if self.action == "PUBLISH":
             if self.kind is None or self.content is None:
                 raise ValueError("PUBLISH requires kind and content")

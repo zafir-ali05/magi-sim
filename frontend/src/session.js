@@ -54,6 +54,7 @@ export function applyStreamEvent(session, event) {
         ...session,
         status: "running",
         acts: [...session.acts, event],
+        // keep the core lights in the same order as the public acts
         speakingCore: hasSpeaker ? session.speakingCore : event.act.core,
         pendingSpeakers: hasSpeaker
           ? [...session.pendingSpeakers, event.act.core]

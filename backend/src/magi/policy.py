@@ -29,6 +29,7 @@ def reduce_ballots(
         return PolicyDecision("INCOMPLETE", "INCOMPLETE", True, ())
 
     ordered = tuple(by_core[core] for core in CORE_ORDER)
+    # keep the first copy when two ballots use the exact same condition
     conditions = tuple(
         dict.fromkeys(
             condition

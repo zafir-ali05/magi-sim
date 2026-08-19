@@ -16,15 +16,15 @@ ATTEMPT_LIMIT = 4
 
 
 class DeepSeekError(RuntimeError):
-    """A provider failure safe to expose to the public API."""
+    """Provider error safe to show in the public stream."""
 
 
 class _AttemptFailure(Exception):
-    """Internal failure carrying only a sanitized explanation."""
+    """Reason one provider attempt failed."""
 
 
 def _account_usage(response: Any) -> TokenUsage:
-    """Read aggregate usage, including private reasoning tokens, then discard it."""
+    """Count tokens without keeping private reasoning."""
 
     usage = getattr(response, "usage", None)
     if usage is None:
@@ -97,7 +97,7 @@ async def ask_deepseek(
     effort: Literal["high", "max"],
     max_tokens: int,
 ) -> Generation[T]:
-    """Request and validate one public response from an independent MAGI core."""
+    """Ask one core for a validated public response."""
 
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
@@ -116,7 +116,7 @@ async def ask_deepseek(
         provider_failure = False
         try:
             response = await client.chat.completions.create(
-                model="deepseek-v4-flash",
+                model="deepseek-v4-pro",
                 messages=request_messages,
                 reasoning_effort=effort,
                 extra_body={"thinking": {"type": "enabled"}},
@@ -129,8 +129,7 @@ async def ask_deepseek(
         except _AttemptFailure as exc:
             failure = str(exc)
         except Exception:
-            # SDK exception text can contain request metadata or secrets. Keep it
-            # out of both retry diagnostics and the public exception.
+            # provider errors can include request details, so don't pass them through
             failure = "provider request failed"
             provider_failure = True
 

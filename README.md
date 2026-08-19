@@ -1,10 +1,10 @@
 # MAGI simulator
 
-This is a small project based on the MAGI system from *Neon Genesis Evangelion*. I mostly wanted to see what would happen if the three parts of the system were treated as independent AI decision makers instead of wrapping one normal chatbot response in three names.
+This is a small side project based on the MAGI system from *Neon Genesis Evangelion*. I mostly wanted to see what the three cores would look like as actual AI workers instead of one chatbot answer copied into three boxes.
 
-Evangelion leaves most of the actual machinery unexplained. The anime gives each MAGI core a different part of Naoko Akagi's personality and shows them reaching decisions through voting. This project takes that idea and turns it into a visible, bounded discussion between three AI perspectives. So yeah, it is my interpretation of the MAGI built as a normal Python web app. The fictional biological hardware is still fictional.
+Evangelion leaves most of the machinery unexplained. The anime gives each core a different part of Naoko Akagi's personality and shows them voting on decisions. Basically, this is my take on that idea built as a normal Python web app. The fictional biological hardware is still fictional.
 
-Everything runs locally. It gives advice, shows short public conclusions and objections, and produces a majority decision. Real-world execution is outside its scope.
+Everything runs locally. It gives advice, shows the public discussion, and produces a majority decision. It does not execute anything outside the app.
 
 ## The three cores
 
@@ -14,7 +14,7 @@ Each core uses the same DeepSeek model with a separate identity and decision met
 - **BALTHASAR-2, the mother:** looks at care, consent, vulnerability, protection, and who carries the risk.
 - **CASPER-3, the woman:** looks at desire, autonomy, identity, relationships, incentives, and how people are likely to behave.
 
-Those descriptions come from the anime's scientist, mother, and woman split. The more detailed methods are project interpretations that make the roles useful during an actual discussion. They are also given failure modes to avoid, so Melchior should not become cold and amoral, Balthasar should not turn care into control, and Casper should not manufacture emotional contrarianism for the sake of it.
+Those three labels come from the anime. The detailed methods are my own interpretation so the roles have something useful to work with. I also gave them a few failure modes to avoid. Melchior should not become cold and amoral, Balthasar should not turn care into control, and Casper should not argue just for the sake of it.
 
 ## How the discussion works
 
@@ -42,39 +42,39 @@ three private ballots
 majority result
 ```
 
-All three openings are requested concurrently from the same motion. Each core forms its opening blind to the other two. Once all three are ready, the coordinator commits them to the public transcript in a stable order.
+All three opening calls start together. None of the cores sees the other openings early, and the coordinator adds them to the transcript in a fixed order once all three are done.
 
-The discussion then becomes event-driven. Each core has a worker and an `asyncio.Queue` inbox. The inbox carries transcript version notifications, and every conversation passes through the validated shared record. When a new public act is committed, the other workers wake up, inspect the latest transcript, and independently choose one action:
+After that, each core has a worker and an `asyncio.Queue` inbox. The queue messages are just transcript version numbers. The agents are not directly DMing each other or passing around hidden reasoning. When a public act is added, the other workers wake up, read the newest transcript, and pick one action:
 
 - `PUBLISH` a challenge, response, concession, clarification, or condition.
 - `PASS` because nothing useful needs to be added yet.
 - `READY` because the core has reviewed the current version and has no remaining public objection.
 
-There is no fixed MELCHIOR -> BALTHASAR -> CASPER loop. A core can respond several times, stay quiet, concede a point, or become ready. Publishing a new act wakes the peers again and revokes their earlier readiness because the shared record has changed.
+There is no fixed MELCHIOR -> BALTHASAR -> CASPER loop. A core can respond a few times, stay quiet, concede something, or mark itself ready. A new act wakes the other cores again because their previous review is now stale.
 
-The workers stay alive and listen during one deliberation. Every LLM response is still a fresh API inference supplied with that core's identity, the motion, and the current public transcript. The coordinator, queues, transcript, and session state provide the continuity. Honestly, that is enough for this local version without pulling in Redis or a whole agent framework.
+The workers stay alive for one deliberation. Every response is still a fresh API call with that core's identity, the motion, and the current public transcript. The coordinator and queues are what make it feel like one continuing discussion. Honestly, that is enough for this local version without pulling in Redis or some huge agent framework.
 
-Discussion is deliberately bounded. By default, each core gets up to five review evaluations and three public contributions, while the entire discussion has time and token limits. This keeps one stubborn loop from going forever or quietly burning through an absurd number of tokens.
+The discussion has limits. Each core gets up to five reviews and three public contributions by default, plus there is an overall time and token budget. Otherwise one stubborn loop could run forever and burn through a dumb amount of tokens.
 
 ## Ballots and decisions
 
-Once review closes, the public transcript is frozen. Each core receives the same final transcript and casts a private ballot with one of these votes:
+When the discussion stops, the transcript is frozen. Each core gets the same final copy and casts a private ballot:
 
 - `AGREE`
 - `DISAGREE`
 - `CONDITIONAL`, with explicit conditions
 
-Ballots stay hidden until all three are complete. The current interface always uses majority rule. Two affirmative votes approve the motion, with `CONDITIONAL` counting as affirmative and producing an approved-with-conditions result. Fewer than two affirmative votes reject it. A missing or failed core produces an incomplete result instead of pretending that silence means agreement.
+Ballots stay hidden until all three are done. The interface always uses majority rule. Two affirmative votes approve the motion, and a `CONDITIONAL` vote adds its conditions to the result. Fewer than two rejects it. If a core fails, the result is incomplete instead of treating silence as agreement.
 
-Final ballot calls use DeepSeek's maximum reasoning setting. Openings and public reviews use high reasoning. The adapter validates every response against a strict schema and retries malformed output with a repair instruction.
+Final ballots use DeepSeek's maximum reasoning setting. Openings and public reviews use high reasoning. Every answer gets checked against the expected JSON shape, and malformed output gets another try with a repair message.
 
-Private provider reasoning content is never displayed, persisted, streamed, or passed between cores. Its token count can be recorded for budget accounting, but the content itself is discarded. The visible transcript contains only short, validated public acts.
+Private provider reasoning is never displayed, saved, streamed, or passed between cores. I count its tokens for the budget and throw away the content. Only the short public acts make it into the transcript.
 
 ## Stack
 
 - **Frontend:** React 19, Vite 7, and plain CSS
 - **Backend:** Python 3.12+, FastAPI, Pydantic, and `asyncio`
-- **LLM:** DeepSeek V4 Flash through its OpenAI-compatible API
+- **LLM:** DeepSeek V4 Pro through its OpenAI-compatible API
 - **Streaming:** newline-delimited JSON over one HTTP response
 
 ## Running it locally

@@ -105,6 +105,7 @@ export default function App() {
     setSession(createSession(startedAt));
 
     let terminalEventSeen = false;
+    // every line in the response should be one complete event
     const processLine = (line) => {
       if (requestId !== requestIdRef.current) return;
       if (!line.trim()) return;
@@ -133,6 +134,7 @@ export default function App() {
       const decoded = response.body.pipeThrough(new TextDecoderStream());
       let remainder = "";
       for await (const chunk of decoded) {
+        // hang onto partial lines until the next chunk shows up
         const parsedChunk = parseNdjsonChunk(remainder, chunk);
         remainder = parsedChunk.remainder;
         for (const line of parsedChunk.lines) processLine(line);

@@ -142,11 +142,10 @@ export function getSystemVisualState({
 }
 
 function coreTitle(core) {
-  return typeof core === "string" ? core.split("-")[0].toLowerCase() : "core";
+  return core.split("-")[0].toLowerCase();
 }
 
 function publicActLines(acts, core) {
-  if (!Array.isArray(acts)) return [];
   return acts
     .filter((event) => event?.act?.core === core)
     .map(
@@ -189,7 +188,7 @@ export function buildCoreDialogModel({
     status: state.english.toLowerCase(),
     error: error || "—",
     conditions:
-      Array.isArray(ballot?.conditions) && ballot.conditions.length > 0
+      ballot?.conditions.length > 0
         ? ballot.conditions.join("\n")
         : "—",
     fullResponse: responseParts.length > 0 ? responseParts.join("\n\n") : "Waiting for public response...",

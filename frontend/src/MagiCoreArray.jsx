@@ -84,7 +84,7 @@ export function MagiCoreArray({
   latestEventId = 0,
   onSelectCore = () => {},
 }) {
-  const publicBallots = result && Array.isArray(ballots) ? ballots : [];
+  const publicBallots = result ? ballots ?? [] : [];
   const systemState = getSystemVisualState({ phase, sessionStatus, ballotsLocked, result });
 
   return (

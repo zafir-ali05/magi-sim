@@ -29,6 +29,7 @@ class Transcript:
             raise TranscriptFrozenError("Transcript is frozen")
         if seen_through_event_id < 0 or seen_through_event_id > self.version:
             raise ValueError("seen_through_event_id must reference an existing transcript version")
+        # a core can only reply to something it already saw
         if act.reply_to is not None and not 1 <= act.reply_to <= seen_through_event_id:
             raise ValueError("reply_to must reference an event visible to the responding core")
 

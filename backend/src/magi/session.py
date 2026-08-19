@@ -20,9 +20,6 @@ SessionPhase = Literal[
 ClosureReason = Literal["natural", "budget", "timeout", "failure"]
 
 TERMINAL_PHASES = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
-CLOSURE_REASONS = frozenset({"natural", "budget", "timeout", "failure"})
-
-
 @dataclass
 class CoreRuntimeState:
     reviewed_through_event_id: int = 0
@@ -30,6 +27,7 @@ class CoreRuntimeState:
     in_flight: bool = False
     inbox_depth: int = 0
     status: CoreStatus = "LISTENING"
+    # a failed core cannot quietly fall through to the ballot
     ballot_eligible: bool = True
 
 
@@ -40,10 +38,7 @@ class MagiSession:
         self._cores = {core: CoreRuntimeState() for core in CORE_ORDER}
 
     def core(self, core: CoreId) -> CoreRuntimeState:
-        try:
-            return self._cores[core]
-        except KeyError:
-            raise ValueError(f"Unknown MAGI core: {core}") from None
+        return self._cores[core]
 
     def _require_phase(self, expected: SessionPhase) -> None:
         if self.phase in TERMINAL_PHASES:
@@ -58,10 +53,8 @@ class MagiSession:
         self._require_phase("CREATED")
         self.phase = "OPENING"
 
-    def begin_discussion(self, *, latest_event_id: int) -> None:
+    def begin_discussion(self) -> None:
         self._require_phase("OPENING")
-        if latest_event_id < 0:
-            raise ValueError("Latest event id must be non-negative")
         self.phase = "DISCUSSING"
 
     def mark_in_flight(self, core: CoreId, in_flight: bool) -> None:
@@ -121,7 +114,7 @@ class MagiSession:
 
     def revoke_peer_readiness(self, *, sender: CoreId) -> None:
         self._require_discussing()
-        self.core(sender)
+        # peers need another look whenever the public record changes
         for core, state in self._cores.items():
             if core == sender or not state.ready:
                 continue
@@ -129,8 +122,9 @@ class MagiSession:
             state.status = "LISTENING"
 
     def can_close_naturally(self, *, latest_event_id: int) -> bool:
-        if self.phase != "DISCUSSING" or latest_event_id < 0:
+        if self.phase != "DISCUSSING":
             return False
+        # READY only counts after every core has seen the latest event
         return all(
             state.ready
             and state.reviewed_through_event_id >= latest_event_id
@@ -141,8 +135,6 @@ class MagiSession:
 
     def close_discussion(self, *, reason: ClosureReason) -> None:
         self._require_discussing()
-        if reason not in CLOSURE_REASONS:
-            raise ValueError(f"Unsupported closure reason: {reason}")
         self.closure_reason = reason
         self.phase = "DISCUSSION_CLOSED"
 

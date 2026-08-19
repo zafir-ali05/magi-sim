@@ -9,6 +9,7 @@ from .models import CORE_ORDER, CoreId, TokenUsage
 
 @dataclass(frozen=True)
 class DiscussionLimits:
+    # reviews include PASS and READY, contributions only count published acts
     max_contributions_per_core: int = 3
     max_evaluations_per_core: int = 5
     timeout_seconds: float = 300
@@ -24,6 +25,7 @@ class BudgetLedger:
     ) -> None:
         self.limits = limits or DiscussionLimits()
         self._clock = clock
+        # this starts after the openings, so they do not eat discussion time
         self._started_at = clock()
         self._evaluations = {core: 0 for core in CORE_ORDER}
         self._contributions = {core: 0 for core in CORE_ORDER}
@@ -33,10 +35,6 @@ class BudgetLedger:
     def total_tokens(self) -> int:
         return self._total_tokens
 
-    def _require_core(self, core: CoreId) -> None:
-        if core not in self._evaluations:
-            raise ValueError(f"Unknown MAGI core: {core}")
-
     def discussion_expired(self) -> bool:
         elapsed = self._clock() - self._started_at
         return (
@@ -45,28 +43,25 @@ class BudgetLedger:
         )
 
     def can_evaluate(self, core: CoreId) -> bool:
-        self._require_core(core)
         return (
             not self.discussion_expired()
             and self._evaluations[core] < self.limits.max_evaluations_per_core
         )
 
     def can_contribute(self, core: CoreId) -> bool:
-        self._require_core(core)
         return (
             not self.discussion_expired()
             and self._contributions[core] < self.limits.max_contributions_per_core
         )
 
     def remaining_evaluations(self, core: CoreId) -> int:
-        self._require_core(core)
         return max(0, self.limits.max_evaluations_per_core - self._evaluations[core])
 
     def remaining_contributions(self, core: CoreId) -> int:
-        self._require_core(core)
         return max(0, self.limits.max_contributions_per_core - self._contributions[core])
 
     def record_usage(self, usage: TokenUsage) -> None:
+        # total_tokens already includes the private reasoning token count
         if any(
             value < 0
             for value in (
@@ -80,14 +75,12 @@ class BudgetLedger:
         self._total_tokens += usage.total_tokens
 
     def record_evaluation(self, core: CoreId, usage: TokenUsage) -> None:
-        self._require_core(core)
         if self._evaluations[core] >= self.limits.max_evaluations_per_core:
             raise ValueError("Core evaluation budget is exhausted")
         self.record_usage(usage)
         self._evaluations[core] += 1
 
     def record_contribution(self, core: CoreId) -> None:
-        self._require_core(core)
         if self._contributions[core] >= self.limits.max_contributions_per_core:
             raise ValueError("Core contribution budget is exhausted")
         self._contributions[core] += 1
