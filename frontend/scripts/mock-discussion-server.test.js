@@ -22,6 +22,16 @@ test("provides a complete mixed-ballot discussion for browser verification", () 
   );
   assert.equal(acts.some((event) => "round" in event), false);
   assert.equal(events.some((event) => event.type === "core_status"), true);
+  const discussionIndex = events.findIndex(
+    (event) => event.type === "phase" && event.phase === "DISCUSSION",
+  );
+  assert.equal(
+    events
+      .slice(0, discussionIndex)
+      .filter((event) => event.type === "core_status" && event.status === "THINKING")
+      .length,
+    3,
+  );
   const speakingStatuses = events
     .filter((event) => event.type === "core_status" && event.status === "SPEAKING")
     .map((event) => event.core);
@@ -43,6 +53,17 @@ test("provides a complete mixed-ballot discussion for browser verification", () 
     "CONDITIONAL",
     "DISAGREE",
   ]);
+  assert.equal(
+    acts.every(
+      (event) =>
+        event.act.reply_to === null || event.act.reply_to <= event.seen_through_event_id,
+    ),
+    true,
+  );
+  assert.doesNotMatch(
+    JSON.stringify(events.slice(0, -1)),
+    /"ballots"|"vote"|reasoning_content|private_reasoning|DEEPSEEK_API_KEY/,
+  );
 });
 
 test("provides one sanitized error for the explicit failure fixture", () => {

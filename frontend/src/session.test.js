@@ -6,6 +6,8 @@ import {
   applyStreamEvent,
   createSession,
 } from "./session.js";
+import { eventsForMotion } from "../scripts/mock-discussion-server.mjs";
+import { parseStreamEvent } from "./events.js";
 
 test("createSession marks a started request active before the first stream event", () => {
   const startedAt = 1234;
@@ -128,4 +130,33 @@ test("advances speaker presentation independently from stream parsing", () => {
 
   assert.equal(next.speakingCore, "MELCHIOR-1");
   assert.deepEqual(next.pendingSpeakers, ["BALTHASAR-2"]);
+});
+
+test("applies the complete public stream without revealing ballots before the result", () => {
+  const events = eventsForMotion("Should the reversible proposal proceed?");
+  let session = createSession(1000);
+
+  for (const value of events) {
+    const event = parseStreamEvent(value);
+    if (event.type !== "result") {
+      assert.equal(session.ballots, null);
+      assert.equal(session.result, null);
+    }
+    session = applyStreamEvent(session, event);
+    if (event.type === "ballots_locked") {
+      assert.equal(session.ballots, null);
+      assert.equal(session.result, null);
+    }
+  }
+
+  assert.deepEqual(session.ballots.map((ballot) => ballot.vote), [
+    "AGREE",
+    "CONDITIONAL",
+    "DISAGREE",
+  ]);
+  assert.equal(session.result.recommendation, "APPROVED_WITH_CONDITIONS");
+  assert.doesNotMatch(
+    JSON.stringify(session),
+    /reasoning_content|private_reasoning|DEEPSEEK_API_KEY|sk-test-secret/,
+  );
 });

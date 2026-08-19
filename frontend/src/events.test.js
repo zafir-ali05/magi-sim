@@ -141,6 +141,41 @@ test("parseStreamEvent rejects unsupported top-level and nested keys", () => {
     () => parseStreamEvent({ type: "error", message: "failed", secret: "hidden" }),
     /unsupported field/i,
   );
+
+  const privateBallotResult = {
+    type: "result",
+    quorum: "majority",
+    recommendation: "APPROVED",
+    outcome: "APPROVED",
+    requires_human_confirmation: false,
+    ballots: [
+      {
+        core: "MELCHIOR-1",
+        vote: "AGREE",
+        confidence: 0.8,
+        rationale: "Public rationale.",
+        conditions: [],
+        reasoning_content: "private ballot reasoning",
+      },
+      {
+        core: "BALTHASAR-2",
+        vote: "AGREE",
+        confidence: 0.8,
+        rationale: "Public rationale.",
+        conditions: [],
+      },
+      {
+        core: "CASPER-3",
+        vote: "AGREE",
+        confidence: 0.8,
+        rationale: "Public rationale.",
+        conditions: [],
+      },
+    ],
+    conditions: [],
+    disclaimer: "Decision support only.",
+  };
+  assert.throws(() => parseStreamEvent(privateBallotResult), /unsupported field/i);
 });
 
 test("parseStreamEvent mirrors public content and ballot condition bounds", () => {
@@ -258,6 +293,21 @@ test("parseStreamEvent rejects invalid causal and core status fields", () => {
         },
       }),
     /seen_through_event_id/i,
+  );
+  assert.throws(
+    () =>
+      parseStreamEvent({
+        type: "act",
+        id: 4,
+        seen_through_event_id: 3,
+        act: {
+          core: "CASPER-3",
+          kind: "CHALLENGE",
+          content: "Invalid future reference.",
+          reply_to: 4,
+        },
+      }),
+    /reply_to/i,
   );
   assert.throws(
     () =>
