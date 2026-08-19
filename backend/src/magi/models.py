@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 
 CoreId = Literal["MELCHIOR-1", "BALTHASAR-2", "CASPER-3"]
@@ -20,6 +20,14 @@ ActKind = Literal[
     "CLARIFY",
     "READY",
     "PASS",
+]
+ReviewAction = Literal["READY", "PASS", "PUBLISH"]
+ReviewPublicationKind = Literal[
+    "CHALLENGE",
+    "RESPONSE",
+    "CONCEDE",
+    "PROPOSE_CONDITION",
+    "CLARIFY",
 ]
 Vote = Literal["AGREE", "DISAGREE", "CONDITIONAL"]
 DecisionPolicy = Literal["majority", "unanimous", "human_confirm"]
@@ -61,6 +69,23 @@ class Act(_PublicModel):
     kind: ActKind
     content: str = Field(min_length=1, max_length=2_000)
     reply_to: int | None = None
+
+
+class ReviewDecision(_PublicModel):
+    core: CoreId
+    action: ReviewAction
+    kind: ReviewPublicationKind | None = None
+    content: str | None = Field(default=None, min_length=1, max_length=2_000)
+    reply_to: int | None = None
+
+    @model_validator(mode="after")
+    def validate_action_shape(self) -> ReviewDecision:
+        if self.action == "PUBLISH":
+            if self.kind is None or self.content is None:
+                raise ValueError("PUBLISH requires kind and content")
+        elif self.kind is not None or self.content is not None or self.reply_to is not None:
+            raise ValueError("READY and PASS cannot contain public act fields")
+        return self
 
 
 class Ballot(_PublicModel):

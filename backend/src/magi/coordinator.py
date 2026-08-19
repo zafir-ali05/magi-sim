@@ -15,6 +15,7 @@ from .models import (
     CoreStatusEvent,
     Motion,
     PhaseEvent,
+    ReviewDecision,
     ResultEvent,
     StreamEvent,
 )
@@ -27,8 +28,9 @@ from .transcript import Transcript
 DISCLAIMER = (
     "Decision support only; this simulation does not make decisions or take real-world actions."
 )
+BALLOT_REQUEST_ROUNDS = 2
 
-T = TypeVar("T", Act, Ballot)
+T = TypeVar("T", Act, ReviewDecision, Ballot)
 Ask = Callable[
     [CoreId, list[dict[str, str]], type[T], Literal["high", "max"], int],
     Awaitable[Generation[T]],
@@ -180,33 +182,43 @@ class ReactiveCoordinator:
             self.session.begin_balloting()
             yield PhaseEvent(phase="BALLOTING", active_cores=list(CORE_ORDER))
             frozen = self.transcript.freeze()
-            ballot_results = await asyncio.gather(
-                *(
-                    _request(
-                        self.ask,
-                        core,
-                        ballot_messages(core, motion, frozen.events),
-                        Ballot,
-                        "max",
-                        8192,
-                    )
-                    for core in CORE_ORDER
-                ),
-                return_exceptions=True,
-            )
-            successful = [
-                result for result in ballot_results if isinstance(result, Generation)
-            ]
-            for generation in successful:
+            ballots_by_core: dict[CoreId, Generation[Ballot]] = {}
+            pending_cores = list(CORE_ORDER)
+            for _ in range(BALLOT_REQUEST_ROUNDS):
+                round_results = await asyncio.gather(
+                    *(
+                        _request(
+                            self.ask,
+                            core,
+                            ballot_messages(core, motion, frozen.events),
+                            Ballot,
+                            "max",
+                            8192,
+                        )
+                        for core in pending_cores
+                    ),
+                    return_exceptions=True,
+                )
+                failed_cores: list[CoreId] = []
+                for core, result in zip(pending_cores, round_results, strict=True):
+                    if isinstance(result, Generation):
+                        ballots_by_core[core] = cast(Generation[Ballot], result)
+                    else:
+                        failed_cores.append(core)
+                pending_cores = failed_cores
+                if not pending_cores:
+                    break
+
+            for generation in ballots_by_core.values():
                 self.budgets.record_usage(generation.usage)
 
             yield BallotsLockedEvent()
-            if len(successful) != len(CORE_ORDER):
+            if len(ballots_by_core) != len(CORE_ORDER):
                 self.session.fail()
                 yield self._incomplete_result(motion)
                 return
 
-            ballots = [cast(Generation[Ballot], result).value for result in ballot_results]
+            ballots = [ballots_by_core[core].value for core in CORE_ORDER]
             decision = reduce_ballots(motion.quorum, ballots)
             self.session.begin_revealing()
             yield ResultEvent(
@@ -340,7 +352,7 @@ class ReactiveCoordinator:
                             self.budgets.remaining_evaluations(core),
                             state.ready,
                         ),
-                        Act,
+                        ReviewDecision,
                         "high",
                         4096,
                     )
@@ -383,15 +395,28 @@ class ReactiveCoordinator:
             return get_task.result()
         return None
 
-    def _apply_reaction(self, core: CoreId, act: Act, seen_version: int) -> bool:
+    def _apply_reaction(
+        self,
+        core: CoreId,
+        decision: ReviewDecision,
+        seen_version: int,
+    ) -> bool:
         assert self.budgets is not None
-        if act.kind == "PASS":
+        if decision.action == "PASS":
             self._emit_status(core, "LISTENING")
-        elif act.kind == "READY":
+        elif decision.action == "READY":
             self.session.mark_ready(core)
             self._emit_status(core, "READY")
             return False
         elif self.budgets.remaining_contributions(core) > 0:
+            assert decision.kind is not None
+            assert decision.content is not None
+            act = Act(
+                core=core,
+                kind=decision.kind,
+                content=decision.content,
+                reply_to=decision.reply_to,
+            )
             self.budgets.record_contribution(core)
             event = self.transcript.append(act, seen_through_event_id=seen_version)
             if event.id == seen_version + 1:

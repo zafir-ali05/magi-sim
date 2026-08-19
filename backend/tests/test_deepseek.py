@@ -3,10 +3,10 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from magi.deepseek import DeepSeekError, ask_deepseek
-from magi.models import Act, Ballot, Motion
+from magi.models import Act, Ballot, Motion, ReviewDecision
 from magi.prompts import ballot_messages, opening_messages, reaction_messages
 from magi.transcript import Transcript
 
@@ -73,11 +73,14 @@ async def test_request_uses_fixed_thinking_json_configuration(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_malformed_response_is_retried_once(monkeypatch):
+async def test_malformed_response_gets_a_corrective_prompt_and_can_recover_on_third_attempt(
+    monkeypatch,
+):
     monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test-secret")
     client = configured_client(provider_response("not-json"))
     client.chat.completions.create.side_effect = [
         provider_response("not-json"),
+        provider_response(json.dumps({"core": "CASPER-3"})),
         provider_response(json.dumps({"core": "CASPER-3", "content": "recovered"})),
     ]
 
@@ -91,9 +94,15 @@ async def test_malformed_response_is_retried_once(monkeypatch):
         )
 
     assert result.value.content == "recovered"
-    assert result.usage.total_tokens == 56
-    assert result.usage.reasoning_tokens == 18
-    assert client.chat.completions.create.await_count == 2
+    assert result.usage.total_tokens == 84
+    assert result.usage.reasoning_tokens == 27
+    assert client.chat.completions.create.await_count == 3
+    second_messages = client.chat.completions.create.await_args_list[1].kwargs["messages"]
+    third_messages = client.chat.completions.create.await_args_list[2].kwargs["messages"]
+    assert "provider returned invalid JSON" in second_messages[-1]["content"]
+    assert "failed schema validation" in third_messages[-1]["content"]
+    assert '"content"' in third_messages[-1]["content"]
+    assert "not-json" not in second_messages[-1]["content"]
 
 
 @pytest.mark.asyncio
@@ -113,22 +122,28 @@ async def test_missing_provider_usage_returns_zero_counts(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_second_failure_is_sanitized(monkeypatch):
+async def test_persistent_ballot_failure_uses_four_attempts_and_stays_sanitized(monkeypatch):
     secret = "sk-test-secret"
     monkeypatch.setenv("DEEPSEEK_API_KEY", secret)
     client = configured_client(provider_response("not-json", reasoning=secret))
     client.chat.completions.create.side_effect = [
         RuntimeError(f"provider leaked {secret} reasoning_content"),
         provider_response("still-not-json", reasoning=secret),
+        provider_response("still-not-json", reasoning=secret),
+        provider_response("still-not-json", reasoning=secret),
     ]
 
-    with patch("magi.deepseek.AsyncOpenAI", return_value=client):
+    with (
+        patch("magi.deepseek.AsyncOpenAI", return_value=client),
+        patch("magi.deepseek.asyncio.sleep", new=AsyncMock()),
+    ):
         with pytest.raises(DeepSeekError) as caught:
-            await ask_deepseek("BALTHASAR-2", [], Probe, "max", 8192)
+            await ask_deepseek("BALTHASAR-2", [], Ballot, "max", 8192)
 
     assert secret not in str(caught.value)
     assert "reasoning_content" not in str(caught.value)
-    assert client.chat.completions.create.await_count == 2
+    assert "4 attempts" in str(caught.value)
+    assert client.chat.completions.create.await_count == 4
 
 
 @pytest.mark.asyncio
@@ -140,6 +155,7 @@ async def test_returned_core_must_match_requested_identity(monkeypatch):
     client.chat.completions.create.side_effect = [
         provider_response(json.dumps({"core": "BALTHASAR-2", "content": "wrong core"})),
         provider_response(json.dumps({"core": "BALTHASAR-2", "content": "still wrong"})),
+        provider_response(json.dumps({"core": "BALTHASAR-2", "content": "still wrong"})),
     ]
 
     with patch("magi.deepseek.AsyncOpenAI", return_value=client):
@@ -148,7 +164,7 @@ async def test_returned_core_must_match_requested_identity(monkeypatch):
 
     assert "core" in str(caught.value).lower()
     assert "BALTHASAR-2" not in str(caught.value)
-    assert client.chat.completions.create.await_count == 2
+    assert client.chat.completions.create.await_count == 3
 
 
 @pytest.mark.asyncio
@@ -213,6 +229,74 @@ def test_prompt_transcripts_number_validated_acts_only():
     assert "Remaining public contributions: 2" in prompt
     assert "Remaining review evaluations: 4" in prompt
     assert "A direct reply is optional" in prompt
+
+
+def test_review_decision_keeps_control_actions_out_of_public_act_fields():
+    assert ReviewDecision(core="MELCHIOR-1", action="READY").action == "READY"
+    assert ReviewDecision(core="BALTHASAR-2", action="PASS").action == "PASS"
+    published = ReviewDecision(
+        core="CASPER-3",
+        action="PUBLISH",
+        kind="CHALLENGE",
+        content="The safeguard is not enforceable.",
+        reply_to=2,
+    )
+    assert published.kind == "CHALLENGE"
+
+    with pytest.raises(ValidationError):
+        ReviewDecision(
+            core="MELCHIOR-1",
+            action="READY",
+            kind="POSITION",
+            content="READY written inside a public position.",
+        )
+    with pytest.raises(ValidationError):
+        ReviewDecision(core="CASPER-3", action="PUBLISH")
+
+
+def test_reaction_prompt_gives_distinct_ready_pass_and_publish_json_contracts():
+    transcript = Transcript()
+    for core in ("MELCHIOR-1", "BALTHASAR-2", "CASPER-3"):
+        transcript.append(
+            Act(core=core, kind="POSITION", content=f"opening from {core}"),
+            seen_through_event_id=0,
+        )
+
+    messages = reaction_messages(
+        "MELCHIOR-1",
+        Motion(question="Proceed?"),
+        transcript.snapshot(),
+        last_reviewed_event_id=0,
+        remaining_contributions=3,
+        remaining_evaluations=5,
+        currently_ready=False,
+    )
+    prompt = "\n".join(message["content"] for message in messages)
+
+    assert '"action": "READY"' in prompt
+    assert '"action": "PASS"' in prompt
+    assert '"action": "PUBLISH"' in prompt
+    assert '"kind": "CHALLENGE"' in prompt
+    assert "POSITION is not a valid review publication kind" in prompt
+
+
+def test_ballot_prompt_defines_every_vote_relative_to_the_motion():
+    prompt = "\n".join(
+        message["content"]
+        for message in ballot_messages(
+            "BALTHASAR-2",
+            Motion(question="Deploy the proposed design?"),
+            [],
+        )
+    )
+
+    assert "AGREE means approve the motion as stated" in prompt
+    assert "DISAGREE means reject the motion" in prompt
+    assert "CONDITIONAL means approve the motion only if" in prompt
+    assert "AGREE never means agreement with another core" in prompt
+    assert '"vote": "AGREE"' in prompt
+    assert '"vote": "DISAGREE"' in prompt
+    assert '"vote": "CONDITIONAL"' in prompt
 
 
 @pytest.mark.parametrize(

@@ -72,14 +72,73 @@ def _act_example(core: CoreId) -> str:
 }}'''
 
 
-def _ballot_example(core: CoreId) -> str:
-    return f'''{{
+def _ballot_contract(core: CoreId) -> str:
+    return f'''Every vote is relative to the motion itself.
+AGREE means approve the motion as stated.
+DISAGREE means reject the motion.
+CONDITIONAL means approve the motion only if every listed condition is satisfied.
+AGREE never means agreement with another core or with a peer argument.
+
+AGREE example:
+{{
   "core": "{core}",
   "vote": "AGREE",
   "confidence": 0.75,
-  "rationale": "A concise decision-support rationale.",
+  "rationale": "Why the motion itself should be approved.",
   "conditions": []
+}}
+
+DISAGREE example:
+{{
+  "core": "{core}",
+  "vote": "DISAGREE",
+  "confidence": 0.75,
+  "rationale": "Why the motion itself should be rejected.",
+  "conditions": []
+}}
+
+CONDITIONAL example:
+{{
+  "core": "{core}",
+  "vote": "CONDITIONAL",
+  "confidence": 0.75,
+  "rationale": "Why the motion is acceptable only under explicit conditions.",
+  "conditions": ["One concrete condition that must be satisfied."]
 }}'''
+
+
+def _review_contract(core: CoreId) -> str:
+    return f'''Choose exactly one of these JSON shapes.
+
+READY — review is complete and no further public objection remains:
+{{
+  "core": "{core}",
+  "action": "READY",
+  "kind": null,
+  "content": null,
+  "reply_to": null
+}}
+
+PASS — no public addition is warranted, but review is not complete:
+{{
+  "core": "{core}",
+  "action": "PASS",
+  "kind": null,
+  "content": null,
+  "reply_to": null
+}}
+
+PUBLISH — append one public review act:
+{{
+  "core": "{core}",
+  "action": "PUBLISH",
+  "kind": "CHALLENGE",
+  "content": "A concise public statement under 120 words.",
+  "reply_to": null
+}}
+
+For PUBLISH, kind must be CHALLENGE, RESPONSE, CONCEDE, PROPOSE_CONDITION, or CLARIFY.
+POSITION is not a valid review publication kind. Never write READY or PASS inside content.'''
 
 
 def _identity(core: CoreId) -> dict[str, str]:
@@ -119,7 +178,7 @@ def _transcript_text(transcript: Transcript) -> str:
     return "\n".join(lines) or "(transcript is empty)"
 
 
-def _shared_rules(*, response_example: str) -> str:
+def _shared_rules(*, response_contract: str) -> str:
     return f"""You are one independent MAGI core in a decision-support simulation.
 Write only an inspectable public answer, not hidden reasoning or chain-of-thought.
 Never reveal hidden reasoning, private analysis, or provider reasoning_content.
@@ -127,11 +186,11 @@ Use only the motion and transcript supplied here; do not invent evidence or cita
 Evaluate the proposed decision; do not help carry out wrongdoing or provide operational details that increase harm, coercion, deception, or evasion.
 Do not manufacture disagreement merely to perform your identity. Agree, concede, or pass when the motion and transcript warrant it.
 Keep public statements under 120 words. You may address a concrete peer claim by its number when useful, but a direct reply is optional; never manufacture a peer claim.
-Return exactly one valid JSON object matching this example and no markdown:
-{response_example}"""
+Return exactly one valid JSON object matching one allowed shape below and no markdown:
+{response_contract}"""
 
 
-def _system_prompt(core: CoreId, *, response_example: str) -> str:
+def _system_prompt(core: CoreId, *, response_contract: str) -> str:
     identity = _identity(core)
     return f"""MAGI CORE: {core}
 Canonical facet: {identity['canonical_facet']}
@@ -140,14 +199,14 @@ Personality: {identity['personality']}
 Decision method: {identity['method']}
 Failure mode to avoid: {identity['guardrail']}
 
-{_shared_rules(response_example=response_example)}"""
+{_shared_rules(response_contract=response_contract)}"""
 
 
 def opening_messages(core: CoreId, motion: Motion) -> list[Message]:
     """Build an independent opening request that has no peer transcript."""
 
     return [
-        {"role": "system", "content": _system_prompt(core, response_example=_act_example(core))},
+        {"role": "system", "content": _system_prompt(core, response_contract=_act_example(core))},
         {
             "role": "user",
             "content": f"""Form your independent opening position on this motion.
@@ -181,7 +240,7 @@ def reaction_messages(
     )
     frozen = _transcript_text(transcript.events)
     return [
-        {"role": "system", "content": _system_prompt(core, response_example=_act_example(core))},
+        {"role": "system", "content": _system_prompt(core, response_contract=_review_contract(core))},
         {
             "role": "user",
             "content": f"""Independently review the coordinator-owned shared review record below.
@@ -201,8 +260,8 @@ The coordinator, not you, records the transcript version seen when it commits a 
 SHARED REVIEW RECORD:
 {frozen}
 
-Required output JSON example:
-{_act_example(core)}""",
+Required output JSON contract:
+{_review_contract(core)}""",
         },
     ]
 
@@ -216,7 +275,7 @@ def ballot_messages(
 
     frozen = _transcript_text(transcript)
     return [
-        {"role": "system", "content": _system_prompt(core, response_example=_ballot_example(core))},
+        {"role": "system", "content": _system_prompt(core, response_contract=_ballot_contract(core))},
         {
             "role": "user",
             "content": f"""Cast your private final ballot on the motion using the final transcript below.
@@ -228,7 +287,7 @@ Use CONDITIONAL when support depends on explicit conditions, and list those cond
 FINAL FROZEN TRANSCRIPT:
 {frozen}
 
-Required output JSON example:
-{_ballot_example(core)}""",
+Required output JSON contract:
+{_ballot_contract(core)}""",
         },
     ]

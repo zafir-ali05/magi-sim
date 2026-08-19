@@ -6,7 +6,7 @@ import pytest
 
 from magi.budgets import DiscussionLimits
 from magi.deepseek import Generation, TokenUsage
-from magi.models import CORE_ORDER, Act, Ballot, Motion
+from magi.models import CORE_ORDER, Act, Ballot, Motion, ReviewDecision
 
 
 ZERO_USAGE = TokenUsage(0, 0, 0, 0)
@@ -14,6 +14,18 @@ ZERO_USAGE = TokenUsage(0, 0, 0, 0)
 
 def make_act(core, kind, content):
     return Act(core=core, kind=kind, content=content)
+
+
+def make_review(core, action, content=None, *, reply_to=None):
+    if action in {"READY", "PASS"}:
+        return ReviewDecision(core=core, action=action)
+    return ReviewDecision(
+        core=core,
+        action="PUBLISH",
+        kind=action,
+        content=content or f"{action.lower()} from {core}",
+        reply_to=reply_to,
+    )
 
 
 def make_ballot(core, vote, rationale, conditions=None):
@@ -54,9 +66,9 @@ class ReadyAsk:
                 make_act(core, "POSITION", f"opening from {core}"),
                 ZERO_USAGE,
             )
-        if schema is Act and "coordinator-owned shared review record" in prompt:
+        if schema is ReviewDecision and "coordinator-owned shared review record" in prompt:
             self.reaction_calls.append(core)
-            return Generation(make_act(core, "READY", f"ready from {core}"), ZERO_USAGE)
+            return Generation(make_review(core, "READY"), ZERO_USAGE)
         if schema is Ballot and "Cast your private final ballot" in prompt:
             self.completed_ballots.append(core)
             return Generation(self.ballots[core], ZERO_USAGE)
@@ -105,61 +117,61 @@ class ReactiveScenarioAsk:
             self.opening_completed[core].set()
             return Generation(make_act(core, "POSITION", f"opening from {core}"), ZERO_USAGE)
 
-        if schema is Act and "coordinator-owned shared review record" in prompt:
+        if schema is ReviewDecision and "coordinator-owned shared review record" in prompt:
             version = prompt_version(prompt)
             self.review_versions[core].append(version)
             self.review_calls[core] += 1
 
             if core == "MELCHIOR-1" and version == 3:
                 self.initial_review_returned[core].set()
-                return Generation(make_act(core, "READY", "initial review complete"), ZERO_USAGE)
+                return Generation(make_review(core, "READY"), ZERO_USAGE)
             if core == "BALTHASAR-2" and version == 3:
                 self.initial_review_returned[core].set()
                 if self.review_calls[core] > 1:
                     await self.challenge_committed.wait()
-                return Generation(make_act(core, "PASS", "no public addition yet"), ZERO_USAGE)
+                return Generation(make_review(core, "PASS"), ZERO_USAGE)
             if core == "CASPER-3" and not self.challenge_returned:
                 await asyncio.gather(
                     *(event.wait() for event in self.initial_review_returned.values())
                 )
                 self.challenge_returned = True
                 return Generation(
-                    Act(
-                        core=core,
-                        kind="CHALLENGE",
-                        content="The safeguards may not survive the incentive to expand.",
+                    make_review(
+                        core,
+                        "CHALLENGE",
+                        "The safeguards may not survive the incentive to expand.",
                     ),
                     ZERO_USAGE,
                 )
             if core == "MELCHIOR-1" and version >= 4 and not self.response_returned:
                 self.response_returned = True
                 return Generation(
-                    Act(
-                        core=core,
-                        kind="RESPONSE",
-                        content="Use one bounded cycle with an explicit rollback threshold.",
+                    make_review(
+                        core,
+                        "RESPONSE",
+                        "Use one bounded cycle with an explicit rollback threshold.",
                         reply_to=4,
                     ),
                     ZERO_USAGE,
                 )
             if core == "BALTHASAR-2" and version == 4:
                 await self.response_committed.wait()
-                return Generation(make_act(core, "PASS", "waiting for the shared record"), ZERO_USAGE)
+                return Generation(make_review(core, "PASS"), ZERO_USAGE)
             if core == "BALTHASAR-2" and version >= 5 and not self.condition_returned:
                 self.condition_returned = True
                 return Generation(
-                    Act(
-                        core=core,
-                        kind="PROPOSE_CONDITION",
-                        content="Keep notice, review, and a human appeal path in force.",
+                    make_review(
+                        core,
+                        "PROPOSE_CONDITION",
+                        "Keep notice, review, and a human appeal path in force.",
                         reply_to=5,
                     ),
                     ZERO_USAGE,
                 )
             if not self.condition_committed.is_set():
                 await self.condition_committed.wait()
-                return Generation(make_act(core, "PASS", "condition noted"), ZERO_USAGE)
-            return Generation(make_act(core, "READY", "review complete"), ZERO_USAGE)
+                return Generation(make_review(core, "PASS"), ZERO_USAGE)
+            return Generation(make_review(core, "READY"), ZERO_USAGE)
 
         if schema is Ballot and "Cast your private final ballot" in prompt:
             self.ballots_started.add(core)

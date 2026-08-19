@@ -7,7 +7,7 @@ import pytest
 from magi.budgets import DiscussionLimits
 from magi.coordinator import CoordinatorFailure, ReactiveCoordinator
 from magi.deepseek import Generation, TokenUsage
-from magi.models import CORE_ORDER, Act, Ballot, Motion
+from magi.models import CORE_ORDER, Act, Ballot, Motion, ReviewDecision
 
 
 ZERO_USAGE = TokenUsage(0, 0, 0, 0)
@@ -18,6 +18,18 @@ def make_act(core, kind, content=None, *, reply_to=None):
         core=core,
         kind=kind,
         content=content or f"{kind.lower()} from {core}",
+        reply_to=reply_to,
+    )
+
+
+def make_review(core, action, content=None, *, reply_to=None):
+    if action in {"READY", "PASS"}:
+        return ReviewDecision(core=core, action=action)
+    return ReviewDecision(
+        core=core,
+        action="PUBLISH",
+        kind=action,
+        content=content or f"{action.lower()} from {core}",
         reply_to=reply_to,
     )
 
@@ -75,7 +87,7 @@ class FunctionalAsk:
         return make_act(core, "POSITION", f"opening from {core}")
 
     async def _reaction(self, core, call_number, version, prompt):
-        return make_act(core, "READY")
+        return make_review(core, "READY")
 
     async def _ballot(self, core, prompt):
         return make_ballot(core)
@@ -87,7 +99,7 @@ class FunctionalAsk:
             value = await self.opening(core, prompt)
             return Generation(value, self.opening_usage)
 
-        if schema is Act and "coordinator-owned shared review record" in prompt:
+        if schema is ReviewDecision and "coordinator-owned shared review record" in prompt:
             self.reaction_calls[core] += 1
             call_number = self.reaction_calls[core]
             version = prompt_version(prompt)
@@ -214,11 +226,11 @@ async def test_pass_ready_and_optional_public_act_are_independent_review_outcome
     async def reaction(core, call_number, version, prompt):
         if call_number == 1:
             return {
-                "MELCHIOR-1": make_act(core, "READY"),
-                "BALTHASAR-2": make_act(core, "PASS"),
-                "CASPER-3": make_act(core, "CHALLENGE", reply_to=None),
+                "MELCHIOR-1": make_review(core, "READY"),
+                "BALTHASAR-2": make_review(core, "PASS"),
+                "CASPER-3": make_review(core, "CHALLENGE", reply_to=None),
             }[core]
-        return make_act(core, "READY")
+        return make_review(core, "READY")
 
     fake = FunctionalAsk(reaction=reaction)
     events = await collect(ReactiveCoordinator(fake, review_debounce_seconds=0))
@@ -250,6 +262,27 @@ async def test_pass_ready_and_optional_public_act_are_independent_review_outcome
 
 
 @pytest.mark.asyncio
+async def test_review_workers_request_typed_control_decisions_instead_of_public_acts():
+    async def ask(core, messages, schema, effort, max_tokens):
+        prompt = messages[1]["content"]
+        if schema is Act and "Form your independent opening" in prompt:
+            return Generation(make_act(core, "POSITION"), ZERO_USAGE)
+        if "coordinator-owned shared review record" in prompt:
+            assert schema is ReviewDecision
+            return Generation(ReviewDecision(core=core, action="READY"), ZERO_USAGE)
+        if schema is Ballot:
+            return Generation(make_ballot(core), ZERO_USAGE)
+        raise AssertionError(f"Unexpected request for {core}: {prompt}")
+
+    events = await collect(ReactiveCoordinator(ask, review_debounce_seconds=0))
+    acts = [event for event in events if event.type == "act"]
+    result = next(event for event in events if event.type == "result")
+
+    assert len(acts) == 3
+    assert result.outcome == "APPROVED"
+
+
+@pytest.mark.asyncio
 async def test_notification_arriving_in_flight_is_reviewed_by_the_same_single_worker():
     casper_started = asyncio.Event()
     release_casper = asyncio.Event()
@@ -258,11 +291,11 @@ async def test_notification_arriving_in_flight_is_reviewed_by_the_same_single_wo
         if core == "CASPER-3" and call_number == 1:
             casper_started.set()
             await release_casper.wait()
-            return make_act(core, "PASS")
+            return make_review(core, "PASS")
         if core == "MELCHIOR-1" and call_number == 1:
             await casper_started.wait()
-            return make_act(core, "CHALLENGE", reply_to=1)
-        return make_act(core, "READY")
+            return make_review(core, "CHALLENGE", reply_to=1)
+        return make_review(core, "READY")
 
     fake = FunctionalAsk(reaction=reaction)
 
@@ -294,8 +327,8 @@ async def test_concurrent_public_acts_do_not_claim_unseen_intervening_events_as_
             if len(responders_started) == 2:
                 release_responders.set()
             await release_responders.wait()
-            return make_act(core, "CHALLENGE", reply_to=1)
-        return make_act(core, "READY")
+            return make_review(core, "CHALLENGE", reply_to=1)
+        return make_review(core, "READY")
 
     fake = FunctionalAsk(reaction=reaction)
     events = await collect(ReactiveCoordinator(fake, review_debounce_seconds=0))
@@ -315,23 +348,23 @@ async def test_optional_causal_chain_uses_only_visible_event_ids():
     async def reaction(core, call_number, version, prompt):
         if core == "CASPER-3" and version == 3:
             casper_challenged.set()
-            return make_act(core, "CHALLENGE", reply_to=None)
+            return make_review(core, "CHALLENGE", reply_to=None)
         if core == "MELCHIOR-1" and version < 4:
             await casper_challenged.wait()
-            return make_act(core, "PASS")
+            return make_review(core, "PASS")
         if core == "MELCHIOR-1" and version < 6:
             if not melchior_responded.is_set():
                 melchior_responded.set()
-                return make_act(core, "RESPONSE", reply_to=4)
-            return make_act(core, "PASS")
+                return make_review(core, "RESPONSE", reply_to=4)
+            return make_review(core, "PASS")
         if core == "BALTHASAR-2" and version < 5:
             await melchior_responded.wait()
-            return make_act(core, "PASS")
+            return make_review(core, "PASS")
         if core == "BALTHASAR-2" and version == 5:
-            return make_act(core, "PROPOSE_CONDITION", reply_to=5)
+            return make_review(core, "PROPOSE_CONDITION", reply_to=5)
         if version < 6:
-            return make_act(core, "PASS")
-        return make_act(core, "READY")
+            return make_review(core, "PASS")
+        return make_review(core, "READY")
 
     fake = FunctionalAsk(reaction=reaction)
     events = await asyncio.wait_for(
@@ -358,8 +391,8 @@ async def test_optional_causal_chain_uses_only_visible_event_ids():
 async def test_pass_retries_are_bounded_by_the_per_core_evaluation_budget():
     async def reaction(core, call_number, version, prompt):
         if core == "MELCHIOR-1":
-            return make_act(core, "PASS")
-        return make_act(core, "READY")
+            return make_review(core, "PASS")
+        return make_review(core, "READY")
 
     fake = FunctionalAsk(reaction=reaction)
     events = await collect(ReactiveCoordinator(fake, review_debounce_seconds=0))
@@ -380,8 +413,8 @@ async def test_pass_retries_are_bounded_by_the_per_core_evaluation_budget():
 async def test_fourth_public_contribution_is_not_committed():
     async def reaction(core, call_number, version, prompt):
         if core == "CASPER-3":
-            return make_act(core, "CLARIFY", f"contribution {call_number}")
-        return make_act(core, "READY")
+            return make_review(core, "CLARIFY", f"contribution {call_number}")
+        return make_review(core, "READY")
 
     fake = FunctionalAsk(reaction=reaction)
     events = await collect(ReactiveCoordinator(fake, review_debounce_seconds=0))
@@ -402,7 +435,7 @@ async def test_fourth_public_contribution_is_not_committed():
 @pytest.mark.asyncio
 async def test_total_token_expiry_waits_for_in_flight_accounting_then_ballots():
     async def reaction(core, call_number, version, prompt):
-        return make_act(core, "PASS")
+        return make_review(core, "PASS")
 
     fake = FunctionalAsk(reaction=reaction)
     fake.reaction_usage = TokenUsage(1, 3, 1, 4)
@@ -434,7 +467,7 @@ async def test_failed_review_core_blocks_ballots_and_returns_incomplete():
     async def reaction(core, call_number, version, prompt):
         if core == "CASPER-3":
             raise RuntimeError("private provider failure")
-        return make_act(core, "READY")
+        return make_review(core, "READY")
 
     fake = FunctionalAsk(reaction=reaction)
     events = await collect(ReactiveCoordinator(fake, review_debounce_seconds=0))
@@ -479,6 +512,32 @@ async def test_ballot_failure_waits_for_peers_and_reveals_no_partial_votes():
 
 
 @pytest.mark.asyncio
+async def test_only_failed_ballot_is_retried_against_the_frozen_transcript():
+    attempts = defaultdict(int)
+    prompts = defaultdict(list)
+
+    async def ballot(core, prompt):
+        attempts[core] += 1
+        prompts[core].append(prompt)
+        if core == "CASPER-3" and attempts[core] == 1:
+            raise RuntimeError("transient private ballot failure")
+        return make_ballot(core)
+
+    fake = FunctionalAsk(ballot=ballot)
+    events = await collect(ReactiveCoordinator(fake, review_debounce_seconds=0))
+    result = next(event for event in events if event.type == "result")
+
+    assert dict(attempts) == {
+        "MELCHIOR-1": 1,
+        "BALTHASAR-2": 1,
+        "CASPER-3": 2,
+    }
+    assert prompts["CASPER-3"][0] == prompts["CASPER-3"][1]
+    assert result.outcome == "APPROVED"
+    assert [ballot.core for ballot in result.ballots] == list(CORE_ORDER)
+
+
+@pytest.mark.asyncio
 async def test_cancellation_stops_every_in_flight_worker():
     never_release = asyncio.Event()
     all_started = asyncio.Event()
@@ -489,7 +548,7 @@ async def test_cancellation_stops_every_in_flight_worker():
         if started == set(CORE_ORDER):
             all_started.set()
         await never_release.wait()
-        return make_act(core, "READY")
+        return make_review(core, "READY")
 
     fake = FunctionalAsk(reaction=reaction)
     run = asyncio.create_task(

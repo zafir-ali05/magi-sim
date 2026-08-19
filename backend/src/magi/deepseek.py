@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 from dataclasses import dataclass
@@ -8,7 +9,7 @@ from typing import Any, Generic, Literal, TypeVar
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
-from .models import CoreId
+from .models import Ballot, CoreId
 
 
 T = TypeVar("T", bound=BaseModel)
@@ -105,6 +106,16 @@ def _parse_response(content: str, schema: type[T], core: CoreId) -> T:
     return result
 
 
+def _repair_instruction(schema: type[T], core: CoreId, failure: str) -> str:
+    contract = json.dumps(schema.model_json_schema(), separators=(",", ":"))
+    return (
+        "RETRY: Your previous answer was rejected because "
+        f"{failure}. Return exactly one JSON object for core {core}. "
+        "Follow this JSON Schema exactly, include every required field, use only allowed "
+        f"enum values, and include no additional fields: {contract}"
+    )
+
+
 async def ask_deepseek(
     core: CoreId,
     messages: list[dict[str, str]],
@@ -125,12 +136,15 @@ async def ask_deepseek(
     )
     usage_totals = TokenUsage(0, 0, 0, 0)
     failure = "provider request failed"
+    attempt_limit = 4 if schema is Ballot else 3
+    request_messages = list(messages)
 
-    for attempt in range(2):
+    for attempt in range(attempt_limit):
+        provider_failure = False
         try:
             response = await client.chat.completions.create(
                 model="deepseek-v4-flash",
-                messages=messages,
+                messages=request_messages,
                 reasoning_effort=effort,
                 extra_body={"thinking": {"type": "enabled"}},
                 response_format={"type": "json_object"},
@@ -145,13 +159,24 @@ async def ask_deepseek(
             # SDK exception text can contain request metadata or secrets. Keep it
             # out of both retry diagnostics and the public exception.
             failure = "provider request failed"
+            provider_failure = True
 
-        if attempt == 0:
-            continue
+        if attempt + 1 >= attempt_limit:
+            # Keep aggregate usage local to this invocation; reasoning content is
+            # deliberately never copied into an exception, model, log, or prompt.
+            _ = usage_totals
+            raise DeepSeekError(
+                f"DeepSeek request failed after {attempt_limit} attempts: {failure}"
+            ) from None
 
-        # Keep aggregate usage local to this invocation; reasoning content is
-        # deliberately never copied into an exception, model, log, or prompt.
-        _ = usage_totals
-        raise DeepSeekError(f"DeepSeek request failed after one retry: {failure}") from None
+        if provider_failure:
+            await asyncio.sleep(0.25 * (2**attempt))
+        request_messages = [
+            *messages,
+            {
+                "role": "user",
+                "content": _repair_instruction(schema, core, failure),
+            },
+        ]
 
-    raise DeepSeekError("DeepSeek request failed after one retry") from None
+    raise DeepSeekError(f"DeepSeek request failed after {attempt_limit} attempts") from None
