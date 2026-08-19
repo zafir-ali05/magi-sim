@@ -5,7 +5,6 @@ from fastapi.responses import StreamingResponse
 from .deliberation import deliberate
 from .models import Motion
 
-
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,

@@ -5,7 +5,6 @@ from typing import Literal
 
 from .models import CORE_ORDER, CoreId, CoreStatus
 
-
 SessionPhase = Literal[
     "CREATED",
     "OPENING",
@@ -20,6 +19,8 @@ SessionPhase = Literal[
 ClosureReason = Literal["natural", "budget", "timeout", "failure"]
 
 TERMINAL_PHASES = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
+
+
 @dataclass
 class CoreRuntimeState:
     reviewed_through_event_id: int = 0
@@ -44,7 +45,9 @@ class MagiSession:
         if self.phase in TERMINAL_PHASES:
             raise RuntimeError(f"Session is terminal in phase {self.phase}")
         if self.phase != expected:
-            raise RuntimeError(f"Operation requires phase {expected}; current phase is {self.phase}")
+            raise RuntimeError(
+                f"Operation requires phase {expected}; current phase is {self.phase}"
+            )
 
     def _require_discussing(self) -> None:
         self._require_phase("DISCUSSING")

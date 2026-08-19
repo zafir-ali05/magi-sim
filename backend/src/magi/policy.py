@@ -32,9 +32,7 @@ def reduce_ballots(
     # keep the first copy when two ballots use the exact same condition
     conditions = tuple(
         dict.fromkeys(
-            condition
-            for ballot in ordered
-            for condition in ballot.conditions
+            condition for ballot in ordered for condition in ballot.conditions
         )
     )
     affirmative = sum(ballot.vote in {"AGREE", "CONDITIONAL"} for ballot in ordered)

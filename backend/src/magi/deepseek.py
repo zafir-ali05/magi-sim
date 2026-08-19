@@ -10,7 +10,6 @@ from pydantic import BaseModel
 
 from .models import CoreId, Generation, TokenUsage
 
-
 T = TypeVar("T", bound=BaseModel)
 ATTEMPT_LIMIT = 4
 
@@ -37,7 +36,9 @@ def _account_usage(response: Any) -> TokenUsage:
 
     details = getattr(usage, "completion_tokens_details", None)
     reasoning_tokens = getattr(details, "reasoning_tokens", 0)
-    aggregate["reasoning_tokens"] = reasoning_tokens if isinstance(reasoning_tokens, int) else 0
+    aggregate["reasoning_tokens"] = (
+        reasoning_tokens if isinstance(reasoning_tokens, int) else 0
+    )
     return TokenUsage(
         prompt_tokens=aggregate["prompt_tokens"],
         completion_tokens=aggregate["completion_tokens"],
@@ -72,7 +73,9 @@ def _parse_response(content: str, schema: type[T], core: CoreId) -> T:
     try:
         result = schema.model_validate(payload)
     except Exception:
-        raise _AttemptFailure("provider returned data that failed schema validation") from None
+        raise _AttemptFailure(
+            "provider returned data that failed schema validation"
+        ) from None
 
     returned_core = getattr(result, "core", None)
     if returned_core != core:

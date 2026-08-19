@@ -58,7 +58,9 @@ class BudgetLedger:
         return max(0, self.limits.max_evaluations_per_core - self._evaluations[core])
 
     def remaining_contributions(self, core: CoreId) -> int:
-        return max(0, self.limits.max_contributions_per_core - self._contributions[core])
+        return max(
+            0, self.limits.max_contributions_per_core - self._contributions[core]
+        )
 
     def record_usage(self, usage: TokenUsage) -> None:
         # total_tokens already includes the private reasoning token count

@@ -8,7 +8,6 @@ from .coordinator import Ask, ReactiveCoordinator
 from .deepseek import ask_deepseek
 from .models import ErrorEvent, Motion, StreamEvent
 
-
 DELIBERATION_TIMEOUT_SECONDS = 5 * 60
 SANITIZED_ERROR_MESSAGE = "Deliberation could not be completed."
 

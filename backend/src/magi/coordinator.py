@@ -15,8 +15,8 @@ from .models import (
     Generation,
     Motion,
     PhaseEvent,
-    ReviewDecision,
     ResultEvent,
+    ReviewDecision,
     StreamEvent,
 )
 from .policy import reduce_ballots
@@ -24,10 +24,7 @@ from .prompts import ballot_messages, opening_messages, reaction_messages
 from .session import MagiSession
 from .transcript import Transcript
 
-
-DISCLAIMER = (
-    "Decision support only; this simulation does not make decisions or take real-world actions."
-)
+DISCLAIMER = "Decision support only; this simulation does not make decisions or take real-world actions."
 BALLOT_REQUEST_ROUNDS = 2
 
 T = TypeVar("T", Act, ReviewDecision, Ballot)
@@ -235,7 +232,9 @@ class ReactiveCoordinator:
             for core in CORE_ORDER
         ]
         try:
-            done, pending = await asyncio.wait(tasks, return_when=asyncio.FIRST_EXCEPTION)
+            done, pending = await asyncio.wait(
+                tasks, return_when=asyncio.FIRST_EXCEPTION
+            )
             if any(task.exception() is not None for task in done):
                 for task in pending:
                     task.cancel()
@@ -254,7 +253,9 @@ class ReactiveCoordinator:
         self._timed_out = True
         self._changed.set()
 
-    def _closure_reason(self) -> Literal["natural", "budget", "timeout", "failure"] | None:
+    def _closure_reason(
+        self,
+    ) -> Literal["natural", "budget", "timeout", "failure"] | None:
         assert self.budgets is not None
         if any(not self.session.core(core).ballot_eligible for core in CORE_ORDER):
             return "failure"
@@ -298,7 +299,11 @@ class ReactiveCoordinator:
                 if self._stop.is_set():
                     return
                 state = self.session.core(core)
-                if versions and max(versions) <= state.reviewed_through_event_id and not retry_current:
+                if (
+                    versions
+                    and max(versions) <= state.reviewed_through_event_id
+                    and not retry_current
+                ):
                     retry_current = False
                     continue
                 assert self.budgets is not None
@@ -341,7 +346,10 @@ class ReactiveCoordinator:
             except asyncio.CancelledError:
                 raise
             except Exception:
-                if self.session.phase == "DISCUSSING" and self.session.core(core).ballot_eligible:
+                if (
+                    self.session.phase == "DISCUSSING"
+                    and self.session.core(core).ballot_eligible
+                ):
                     self.session.mark_failed(core)
                     self._emit_status(core, "FAILED")
                 return
@@ -444,7 +452,9 @@ class ReactiveCoordinator:
             CoreStatusEvent(
                 core=core,
                 status=status,
-                reviewed_through_event_id=self.session.core(core).reviewed_through_event_id,
+                reviewed_through_event_id=self.session.core(
+                    core
+                ).reviewed_through_event_id,
             )
         )
 

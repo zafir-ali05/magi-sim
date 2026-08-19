@@ -5,7 +5,6 @@ from collections.abc import Sequence
 from .models import Act, ActEvent, CoreId, Motion
 from .transcript import FrozenTranscript
 
-
 Message = dict[str, str]
 
 
@@ -151,7 +150,9 @@ Transcript = Sequence[Act | ActEvent]
 def _transcript_text(transcript: Transcript) -> str:
     # keep private provider stuff out of prompts even if a caller messes up
     if isinstance(transcript, (str, bytes)) or not isinstance(transcript, Sequence):
-        raise ValueError("Transcript must contain only validated public Act or ActEvent objects")
+        raise ValueError(
+            "Transcript must contain only validated public Act or ActEvent objects"
+        )
 
     lines: list[str] = []
     for number, item in enumerate(transcript, start=1):
@@ -162,7 +163,9 @@ def _transcript_text(transcript: Transcript) -> str:
             act = item
             event_id = number
         else:
-            raise ValueError("Transcript must contain only validated public Act or ActEvent objects")
+            raise ValueError(
+                "Transcript must contain only validated public Act or ActEvent objects"
+            )
         lines.append(
             f"{event_id}. {act.core} [{act.kind}] {act.content}"
             + (f" (reply_to={act.reply_to})" if act.reply_to is not None else "")
@@ -185,11 +188,11 @@ Return exactly one valid JSON object matching one allowed shape below and no mar
 def _system_prompt(core: CoreId, *, response_contract: str) -> str:
     identity = CORE_IDENTITIES[core]
     return f"""MAGI CORE: {core}
-Canonical facet: {identity['canonical_facet']}
-Operational lens: {identity['operational_lens']}
-Personality: {identity['personality']}
-Decision method: {identity['method']}
-Failure mode to avoid: {identity['guardrail']}
+Canonical facet: {identity["canonical_facet"]}
+Operational lens: {identity["operational_lens"]}
+Personality: {identity["personality"]}
+Decision method: {identity["method"]}
+Failure mode to avoid: {identity["guardrail"]}
 
 {_shared_rules(response_contract=response_contract)}"""
 
@@ -198,7 +201,10 @@ def opening_messages(core: CoreId, motion: Motion) -> list[Message]:
     """Build an independent opening request that has no peer transcript."""
 
     return [
-        {"role": "system", "content": _system_prompt(core, response_contract=_act_example(core))},
+        {
+            "role": "system",
+            "content": _system_prompt(core, response_contract=_act_example(core)),
+        },
         {
             "role": "user",
             "content": f"""Form your independent opening position on this motion.
@@ -230,7 +236,10 @@ def reaction_messages(
     )
     frozen = _transcript_text(transcript.events)
     return [
-        {"role": "system", "content": _system_prompt(core, response_contract=_review_contract(core))},
+        {
+            "role": "system",
+            "content": _system_prompt(core, response_contract=_review_contract(core)),
+        },
         {
             "role": "user",
             "content": f"""Independently review the coordinator-owned shared review record below.
@@ -265,7 +274,10 @@ def ballot_messages(
 
     frozen = _transcript_text(transcript)
     return [
-        {"role": "system", "content": _system_prompt(core, response_contract=_ballot_contract(core))},
+        {
+            "role": "system",
+            "content": _system_prompt(core, response_contract=_ballot_contract(core)),
+        },
         {
             "role": "user",
             "content": f"""Cast your private final ballot on the motion using the final transcript below.

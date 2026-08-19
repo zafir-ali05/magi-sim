@@ -5,7 +5,6 @@ from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-
 CoreId = Literal["MELCHIOR-1", "BALTHASAR-2", "CASPER-3"]
 CORE_ORDER: tuple[CoreId, ...] = (
     "MELCHIOR-1",
@@ -110,7 +109,11 @@ class ReviewDecision(_PublicModel):
         if self.action == "PUBLISH":
             if self.kind is None or self.content is None:
                 raise ValueError("PUBLISH requires kind and content")
-        elif self.kind is not None or self.content is not None or self.reply_to is not None:
+        elif (
+            self.kind is not None
+            or self.content is not None
+            or self.reply_to is not None
+        ):
             raise ValueError("READY and PASS cannot contain public act fields")
         return self
 
