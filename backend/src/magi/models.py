@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Literal
+from dataclasses import dataclass
+from typing import Generic, Literal, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -18,8 +19,6 @@ ActKind = Literal[
     "CONCEDE",
     "PROPOSE_CONDITION",
     "CLARIFY",
-    "READY",
-    "PASS",
 ]
 ReviewAction = Literal["READY", "PASS", "PUBLISH"]
 ReviewPublicationKind = Literal[
@@ -52,6 +51,31 @@ CoreStatus = Literal[
     "BUDGET_EXHAUSTED",
     "FAILED",
 ]
+
+
+T = TypeVar("T", bound=BaseModel)
+
+
+@dataclass(frozen=True)
+class TokenUsage:
+    prompt_tokens: int
+    completion_tokens: int
+    reasoning_tokens: int
+    total_tokens: int
+
+    def __add__(self, other: TokenUsage) -> TokenUsage:
+        return TokenUsage(
+            prompt_tokens=self.prompt_tokens + other.prompt_tokens,
+            completion_tokens=self.completion_tokens + other.completion_tokens,
+            reasoning_tokens=self.reasoning_tokens + other.reasoning_tokens,
+            total_tokens=self.total_tokens + other.total_tokens,
+        )
+
+
+@dataclass(frozen=True)
+class Generation(Generic[T]):
+    value: T
+    usage: TokenUsage
 
 
 class _PublicModel(BaseModel):

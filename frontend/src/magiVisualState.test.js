@@ -14,7 +14,6 @@ function coreState(overrides = {}) {
     core: CORE,
     phase: "STANDBY",
     sessionStatus: "idle",
-    activeCores: [],
     acts: [],
     ballot: null,
     ballotsLocked: false,
@@ -29,7 +28,6 @@ test("maps only the current public speaker to processing during discussion", () 
     key: "information",
     english: "INFORMATION",
     japanese: "情 報",
-    flicker: false,
   });
 
   assert.deepEqual(
@@ -38,7 +36,6 @@ test("maps only the current public speaker to processing during discussion", () 
       key: "processing",
       english: "PROCESSING",
       japanese: "情 報",
-      flicker: false,
     },
   );
 
@@ -47,11 +44,10 @@ test("maps only the current public speaker to processing during discussion", () 
       coreState({
         phase: "DISCUSSION",
         sessionStatus: "running",
-        activeCores: [CORE],
         speakingCore: CORE,
       }),
     ),
-    { key: "processing", english: "SPEAKING", japanese: "情 報", flicker: false },
+    { key: "processing", english: "SPEAKING", japanese: "情 報" },
   );
 
   assert.deepEqual(
@@ -59,11 +55,10 @@ test("maps only the current public speaker to processing during discussion", () 
       coreState({
         phase: "DISCUSSION",
         sessionStatus: "running",
-        activeCores: [CORE],
         speakingCore: "MELCHIOR-1",
       }),
     ),
-    { key: "listening", english: "LISTENING", japanese: "情 報", flicker: false },
+    { key: "listening", english: "LISTENING", japanese: "情 報" },
   );
 });
 
@@ -105,7 +100,6 @@ test("keeps locked ballots concealed behind the processing information state", (
       key: "locked",
       english: "VOTE SEALED",
       japanese: "情 報",
-      flicker: false,
     },
   );
 });
@@ -120,7 +114,7 @@ test("maps each revealed ballot to the matching reference state", () => {
   for (const [vote, key, english, japanese] of cases) {
     assert.deepEqual(
       getCoreVisualState(coreState({ sessionStatus: "complete", phase: "COMPLETE", ballot: { vote } })),
-      { key, english, japanese, flicker: false },
+      { key, english, japanese },
     );
   }
 });
@@ -134,7 +128,7 @@ test("a stream failure takes visual precedence over a revealed ballot", () => {
         ballot: { vote: "AGREE" },
       }),
     ),
-    { key: "error", english: "ERROR", japanese: "誤 差", flicker: false },
+    { key: "error", english: "ERROR", japanese: "誤 差" },
   );
 });
 
@@ -202,7 +196,6 @@ test("builds a locked dialog from public acts without leaking private fields", (
     error: "—",
     conditions: "—",
     fullResponse: "SEEN 3 CHALLENGE: Public objection.\n\nVote sealed until all cores report.",
-    ballotLocked: true,
   });
   assert.doesNotMatch(JSON.stringify(model), /private act reasoning|private event reasoning|reasoning_content/);
 });

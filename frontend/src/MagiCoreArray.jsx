@@ -4,11 +4,11 @@ import { getCoreVisualState, getSystemVisualState } from "./magiVisualState.js";
 
 const CORE_ORDER = ["BALTHASAR-2", "CASPER-3", "MELCHIOR-1"];
 
-const CORE_META = Object.freeze({
+const CORE_META = {
   "BALTHASAR-2": { name: "BALTHASAR", order: 2, className: "balthasar" },
   "CASPER-3": { name: "CASPER", order: 3, className: "casper" },
   "MELCHIOR-1": { name: "MELCHIOR", order: 1, className: "melchior" },
-});
+};
 
 function formatElapsed(milliseconds) {
   const totalSeconds = Math.max(0, Math.floor((milliseconds ?? 0) / 1000));
@@ -74,10 +74,8 @@ function CoreButton({ core, state, speaking, onSelectCore }) {
 export function MagiCoreArray({
   phase = "STANDBY",
   sessionStatus = "idle",
-  activeCores = [],
   coreStatuses = {},
   speakingCore = null,
-  acts = [],
   ballots = null,
   ballotsLocked = false,
   result = null,
@@ -123,10 +121,8 @@ export function MagiCoreArray({
                 core,
                 phase,
                 sessionStatus,
-                activeCores,
                 speakingCore,
                 coreStatus: coreStatuses[core] ?? null,
-                acts,
                 ballot: publicBallots.find((candidate) => candidate.core === core) ?? null,
                 ballotsLocked,
               })}
@@ -142,5 +138,3 @@ export function MagiCoreArray({
     </div>
   );
 }
-
-export { CORE_META, CORE_ORDER };

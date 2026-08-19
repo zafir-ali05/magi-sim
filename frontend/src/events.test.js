@@ -3,6 +3,33 @@ import assert from "node:assert/strict";
 
 import { parseNdjsonChunk, parseStreamEvent } from "./events.js";
 
+const CORES = ["MELCHIOR-1", "BALTHASAR-2", "CASPER-3"];
+
+function validBallot(core, overrides = {}) {
+  return {
+    core,
+    vote: "AGREE",
+    confidence: 0.8,
+    rationale: "A valid rationale.",
+    conditions: [],
+    ...overrides,
+  };
+}
+
+function validResult(overrides = {}) {
+  return {
+    type: "result",
+    quorum: "majority",
+    recommendation: "APPROVED",
+    outcome: "APPROVED",
+    requires_human_confirmation: false,
+    ballots: CORES.map((core) => validBallot(core)),
+    conditions: [],
+    disclaimer: "Decision support only.",
+    ...overrides,
+  };
+}
+
 test("parseStreamEvent accepts the public phase event", () => {
   assert.deepEqual(
     parseStreamEvent({
@@ -64,38 +91,24 @@ test("parseStreamEvent accepts acts, ballot lock, result, and error events", () 
     },
   );
   assert.deepEqual(parseStreamEvent({ type: "ballots_locked" }), { type: "ballots_locked" });
-  const result = parseStreamEvent({
-    type: "result",
-    quorum: "majority",
+  const result = parseStreamEvent(validResult({
     recommendation: "APPROVED_WITH_CONDITIONS",
     outcome: "APPROVED_WITH_CONDITIONS",
-    requires_human_confirmation: false,
     ballots: [
-      {
-        core: "MELCHIOR-1",
-        vote: "AGREE",
-        confidence: 0.8,
-        rationale: "The evidence supports proceeding.",
-        conditions: [],
-      },
-      {
-        core: "BALTHASAR-2",
+      validBallot("MELCHIOR-1", { rationale: "The evidence supports proceeding." }),
+      validBallot("BALTHASAR-2", {
         vote: "CONDITIONAL",
         confidence: 0.65,
         rationale: "Proceed with a reversible safeguard.",
         conditions: ["Keep the affected group informed."],
-      },
-      {
-        core: "CASPER-3",
-        vote: "AGREE",
+      }),
+      validBallot("CASPER-3", {
         confidence: 0.7,
         rationale: "The incentives remain aligned.",
-        conditions: [],
-      },
+      }),
     ],
     conditions: ["Keep the affected group informed."],
-    disclaimer: "Decision support only.",
-  });
+  }));
   assert.equal(result.ballots.length, 3);
   assert.equal(result.quorum, "majority");
   assert.equal(result.recommendation, "APPROVED_WITH_CONDITIONS");
@@ -104,6 +117,26 @@ test("parseStreamEvent accepts acts, ballot lock, result, and error events", () 
     type: "error",
     message: "Deliberation failed.",
   });
+});
+
+test("parseStreamEvent rejects review control outcomes as public acts", () => {
+  for (const kind of ["READY", "PASS"]) {
+    assert.throws(
+      () =>
+        parseStreamEvent({
+          type: "act",
+          id: 4,
+          seen_through_event_id: 3,
+          act: {
+            core: "CASPER-3",
+            kind,
+            content: "No public contribution.",
+            reply_to: null,
+          },
+        }),
+      /act\.kind/i,
+    );
+  }
 });
 
 test("parseStreamEvent rejects unsupported top-level and nested keys", () => {
@@ -142,39 +175,15 @@ test("parseStreamEvent rejects unsupported top-level and nested keys", () => {
     /unsupported field/i,
   );
 
-  const privateBallotResult = {
-    type: "result",
-    quorum: "majority",
-    recommendation: "APPROVED",
-    outcome: "APPROVED",
-    requires_human_confirmation: false,
+  const privateBallotResult = validResult({
     ballots: [
-      {
-        core: "MELCHIOR-1",
-        vote: "AGREE",
-        confidence: 0.8,
-        rationale: "Public rationale.",
-        conditions: [],
+      validBallot("MELCHIOR-1", {
         reasoning_content: "private ballot reasoning",
-      },
-      {
-        core: "BALTHASAR-2",
-        vote: "AGREE",
-        confidence: 0.8,
-        rationale: "Public rationale.",
-        conditions: [],
-      },
-      {
-        core: "CASPER-3",
-        vote: "AGREE",
-        confidence: 0.8,
-        rationale: "Public rationale.",
-        conditions: [],
-      },
+      }),
+      validBallot("BALTHASAR-2"),
+      validBallot("CASPER-3"),
     ],
-    conditions: [],
-    disclaimer: "Decision support only.",
-  };
+  });
   assert.throws(() => parseStreamEvent(privateBallotResult), /unsupported field/i);
 });
 
@@ -196,84 +205,26 @@ test("parseStreamEvent mirrors public content and ballot condition bounds", () =
   );
   assert.throws(
     () =>
-      parseStreamEvent({
-        type: "result",
-        quorum: "majority",
-        recommendation: "APPROVED",
-        outcome: "APPROVED",
-        requires_human_confirmation: false,
+      parseStreamEvent(validResult({
         ballots: [
-          {
-            core: "MELCHIOR-1",
-            vote: "AGREE",
-            confidence: 0.8,
-            rationale: "x".repeat(2001),
-            conditions: [],
-          },
-          {
-            core: "BALTHASAR-2",
-            vote: "AGREE",
-            confidence: 0.8,
-            rationale: "A valid rationale.",
-            conditions: [],
-          },
-          {
-            core: "CASPER-3",
-            vote: "AGREE",
-            confidence: 0.8,
-            rationale: "A valid rationale.",
-            conditions: [],
-          },
+          validBallot("MELCHIOR-1", { rationale: "x".repeat(2001) }),
+          validBallot("BALTHASAR-2"),
+          validBallot("CASPER-3"),
         ],
-        conditions: [],
-        disclaimer: "Decision support only.",
-      }),
+      })),
     /rationale.*2000/i,
   );
   assert.throws(
     () =>
-      parseStreamEvent({
-        type: "result",
-        quorum: "majority",
-        recommendation: "APPROVED",
-        outcome: "APPROVED",
-        requires_human_confirmation: false,
+      parseStreamEvent(validResult({
         ballots: [
-          {
-            core: "MELCHIOR-1",
-            vote: "AGREE",
-            confidence: 0.8,
-            rationale: "A valid rationale.",
-            conditions: [],
-          },
-          {
-            core: "BALTHASAR-2",
-            vote: "AGREE",
-            confidence: 0.8,
-            rationale: "A valid rationale.",
-            conditions: [],
-          },
-          {
-            core: "CASPER-3",
-            vote: "AGREE",
-            confidence: 0.8,
-            rationale: "A valid rationale.",
-            conditions: [
-              "condition 1",
-              "condition 2",
-              "condition 3",
-              "condition 4",
-              "condition 5",
-              "condition 6",
-              "condition 7",
-              "condition 8",
-              "condition 9",
-            ],
-          },
+          validBallot("MELCHIOR-1"),
+          validBallot("BALTHASAR-2"),
+          validBallot("CASPER-3", {
+            conditions: Array.from({ length: 9 }, (_, index) => `condition ${index + 1}`),
+          }),
         ],
-        conditions: [],
-        disclaimer: "Decision support only.",
-      }),
+      })),
     /conditions.*8/i,
   );
 });
@@ -322,38 +273,7 @@ test("parseStreamEvent rejects invalid causal and core status fields", () => {
 });
 
 test("parseStreamEvent rejects invalid decision policy fields", () => {
-  const result = {
-    type: "result",
-    quorum: "majority",
-    recommendation: "APPROVED",
-    outcome: "APPROVED",
-    requires_human_confirmation: false,
-    ballots: [
-      {
-        core: "MELCHIOR-1",
-        vote: "AGREE",
-        confidence: 0.8,
-        rationale: "A valid rationale.",
-        conditions: [],
-      },
-      {
-        core: "BALTHASAR-2",
-        vote: "AGREE",
-        confidence: 0.8,
-        rationale: "A valid rationale.",
-        conditions: [],
-      },
-      {
-        core: "CASPER-3",
-        vote: "AGREE",
-        confidence: 0.8,
-        rationale: "A valid rationale.",
-        conditions: [],
-      },
-    ],
-    conditions: [],
-    disclaimer: "Decision support only.",
-  };
+  const result = validResult();
 
   assert.throws(() => parseStreamEvent({ ...result, quorum: "plurality" }), /quorum/i);
   assert.throws(

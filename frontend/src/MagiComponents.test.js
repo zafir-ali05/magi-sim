@@ -23,9 +23,7 @@ function renderArray(overrides = {}) {
     React.createElement(MagiCoreArray, {
       phase: "STANDBY",
       sessionStatus: "idle",
-      activeCores: [],
       coreStatuses: {},
-      acts: [],
       ballots: null,
       ballotsLocked: false,
       result: null,
@@ -82,7 +80,6 @@ test("illuminates only the core whose public discussion act is being presented",
   const html = renderArray({
     phase: "DISCUSSION",
     sessionStatus: "running",
-    activeCores: ["MELCHIOR-1", "BALTHASAR-2", "CASPER-3"],
     speakingCore: "MELCHIOR-1",
   });
 
@@ -123,7 +120,6 @@ test("renders the reference modal fields and an accessible close control", () =>
         error: "—",
         conditions: "Retain oversight.",
         fullResponse: "SEEN 0 POSITION: Yes.\n\nFINAL RATIONALE: Simple math, but important.",
-        ballotLocked: false,
       },
       onClose() {},
     }),

@@ -3,46 +3,20 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-from dataclasses import dataclass
-from typing import Any, Generic, Literal, TypeVar
+from typing import Any, Literal, TypeVar
 
 from openai import AsyncOpenAI
 from pydantic import BaseModel
 
-from .models import Ballot, CoreId
+from .models import CoreId, Generation, TokenUsage
 
 
 T = TypeVar("T", bound=BaseModel)
-
-
-@dataclass(frozen=True)
-class TokenUsage:
-    prompt_tokens: int
-    completion_tokens: int
-    reasoning_tokens: int
-    total_tokens: int
-
-    def __add__(self, other: TokenUsage) -> TokenUsage:
-        return TokenUsage(
-            prompt_tokens=self.prompt_tokens + other.prompt_tokens,
-            completion_tokens=self.completion_tokens + other.completion_tokens,
-            reasoning_tokens=self.reasoning_tokens + other.reasoning_tokens,
-            total_tokens=self.total_tokens + other.total_tokens,
-        )
-
-
-@dataclass(frozen=True)
-class Generation(Generic[T]):
-    value: T
-    usage: TokenUsage
+ATTEMPT_LIMIT = 4
 
 
 class DeepSeekError(RuntimeError):
     """A provider failure safe to expose to the public API."""
-
-
-class DeepSeekConfigurationError(DeepSeekError):
-    """A missing or invalid provider configuration."""
 
 
 class _AttemptFailure(Exception):
@@ -127,7 +101,7 @@ async def ask_deepseek(
 
     key = os.environ.get("DEEPSEEK_API_KEY")
     if not key:
-        raise DeepSeekConfigurationError("DEEPSEEK_API_KEY is not configured")
+        raise DeepSeekError("DEEPSEEK_API_KEY is not configured")
 
     client = AsyncOpenAI(
         api_key=key,
@@ -136,10 +110,9 @@ async def ask_deepseek(
     )
     usage_totals = TokenUsage(0, 0, 0, 0)
     failure = "provider request failed"
-    attempt_limit = 4 if schema is Ballot else 3
     request_messages = list(messages)
 
-    for attempt in range(attempt_limit):
+    for attempt in range(ATTEMPT_LIMIT):
         provider_failure = False
         try:
             response = await client.chat.completions.create(
@@ -161,12 +134,9 @@ async def ask_deepseek(
             failure = "provider request failed"
             provider_failure = True
 
-        if attempt + 1 >= attempt_limit:
-            # Keep aggregate usage local to this invocation; reasoning content is
-            # deliberately never copied into an exception, model, log, or prompt.
-            _ = usage_totals
+        if attempt + 1 >= ATTEMPT_LIMIT:
             raise DeepSeekError(
-                f"DeepSeek request failed after {attempt_limit} attempts: {failure}"
+                f"DeepSeek request failed after {ATTEMPT_LIMIT} attempts: {failure}"
             ) from None
 
         if provider_failure:
@@ -178,5 +148,3 @@ async def ask_deepseek(
                 "content": _repair_instruction(schema, core, failure),
             },
         ]
-
-    raise DeepSeekError(f"DeepSeek request failed after {attempt_limit} attempts") from None

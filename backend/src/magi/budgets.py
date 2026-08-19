@@ -4,15 +4,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from .deepseek import TokenUsage
-from .models import CoreId
-
-
-CORE_IDS: tuple[CoreId, ...] = (
-    "MELCHIOR-1",
-    "BALTHASAR-2",
-    "CASPER-3",
-)
+from .models import CORE_ORDER, CoreId, TokenUsage
 
 
 @dataclass(frozen=True)
@@ -33,8 +25,8 @@ class BudgetLedger:
         self.limits = limits or DiscussionLimits()
         self._clock = clock
         self._started_at = clock()
-        self._evaluations = {core: 0 for core in CORE_IDS}
-        self._contributions = {core: 0 for core in CORE_IDS}
+        self._evaluations = {core: 0 for core in CORE_ORDER}
+        self._contributions = {core: 0 for core in CORE_ORDER}
         self._total_tokens = 0
 
     @property

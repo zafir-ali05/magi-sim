@@ -6,8 +6,6 @@ const ACT_KINDS = [
   "CONCEDE",
   "PROPOSE_CONDITION",
   "CLARIFY",
-  "READY",
-  "PASS",
 ];
 const VOTES = ["AGREE", "DISAGREE", "CONDITIONAL"];
 const PHASES = ["OPENING", "DISCUSSION", "BALLOTING"];

@@ -172,7 +172,6 @@ export default function App() {
         question: submittedQuestion || question.trim(),
         phase: session.phase,
         sessionStatus: session.status,
-        activeCores: session.activeCores,
         speakingCore: session.speakingCore,
         coreStatus: session.coreStatuses[selectedCore],
         acts: session.acts,
@@ -325,10 +324,8 @@ export default function App() {
           <MagiCoreArray
             phase={session.phase}
             sessionStatus={session.status}
-            activeCores={session.activeCores}
             coreStatuses={session.coreStatuses}
             speakingCore={session.speakingCore}
-            acts={session.acts}
             ballots={session.result ? session.ballots : null}
             ballotsLocked={session.ballotsLocked}
             result={session.result}

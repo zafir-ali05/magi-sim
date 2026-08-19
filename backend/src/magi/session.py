@@ -35,10 +35,9 @@ class CoreRuntimeState:
 
 class MagiSession:
     def __init__(self) -> None:
-        self.cores: tuple[CoreId, ...] = CORE_ORDER
         self.phase: SessionPhase = "CREATED"
         self.closure_reason: ClosureReason | None = None
-        self._cores = {core: CoreRuntimeState() for core in self.cores}
+        self._cores = {core: CoreRuntimeState() for core in CORE_ORDER}
 
     def core(self, core: CoreId) -> CoreRuntimeState:
         try:

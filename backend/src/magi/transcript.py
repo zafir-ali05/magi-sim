@@ -27,8 +27,6 @@ class Transcript:
     def append(self, act: Act, *, seen_through_event_id: int) -> ActEvent:
         if self._frozen:
             raise TranscriptFrozenError("Transcript is frozen")
-        if act.kind in {"PASS", "READY"}:
-            raise ValueError(f"{act.kind} is not a public transcript act")
         if seen_through_event_id < 0 or seen_through_event_id > self.version:
             raise ValueError("seen_through_event_id must reference an existing transcript version")
         if act.reply_to is not None and not 1 <= act.reply_to <= seen_through_event_id:

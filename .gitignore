@@ -4,3 +4,4 @@ docs/
 .env
 frontend/node_modules/
 backend/src/magi/__pycache__/
+backend/tests/

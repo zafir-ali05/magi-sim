@@ -5,7 +5,6 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any, Literal, TypeVar, cast
 
 from .budgets import BudgetLedger, DiscussionLimits
-from .deepseek import Generation, TokenUsage
 from .models import (
     CORE_ORDER,
     Act,
@@ -13,11 +12,13 @@ from .models import (
     BallotsLockedEvent,
     CoreId,
     CoreStatusEvent,
+    Generation,
     Motion,
     PhaseEvent,
     ReviewDecision,
     ResultEvent,
     StreamEvent,
+    TokenUsage,
 )
 from .policy import reduce_ballots
 from .prompts import ballot_messages, opening_messages, reaction_messages
