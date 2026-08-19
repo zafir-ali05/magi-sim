@@ -4,7 +4,6 @@ This is a small side project based on the MAGI system from *Neon Genesis Evangel
 
 Evangelion leaves most of the machinery unexplained. The anime gives each core a different part of Naoko Akagi's personality and shows them voting on decisions. Basically, this is my take on that idea built as a normal Python web app. The fictional biological hardware is still fictional.
 
-Everything runs locally. It gives advice, shows the public discussion, and produces a majority decision. It does not execute anything outside the app.
 
 ## The three cores
 
@@ -73,9 +72,9 @@ Private provider reasoning is never displayed, saved, streamed, or passed betwee
 ## Stack
 
 - **Frontend:** React 19, Vite 7, and plain CSS
-- **Backend:** Python 3.12+, FastAPI, Pydantic, and `asyncio`
-- **LLM:** DeepSeek V4 Pro through its OpenAI-compatible API
-- **Streaming:** newline-delimited JSON over one HTTP response
+- **Backend:** Python 3.14.7, FastAPI, Pydantic, and `asyncio`
+- **LLM:** DeepSeek V4 Pro through its API
+- **Streaming:** JSON over one HTTP response
 
 ## Running it locally
 
