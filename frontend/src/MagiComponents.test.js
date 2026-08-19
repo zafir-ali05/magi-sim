@@ -53,6 +53,13 @@ test("renders the reference headers and three polygon cores in canonical visual 
   assert.ok(balthasar > -1 && casper > balthasar && melchior > casper);
 });
 
+test("gives every core a status tooltip and accessible click instruction", () => {
+  const html = renderArray();
+
+  assert.equal((html.match(/title="Click for status"/g) ?? []).length, 3);
+  assert.equal((html.match(/aria-label="[^"]*Click for status"/g) ?? []).length, 3);
+});
+
 test("does not apply a ballot color until a public result exists", () => {
   const ballot = {
     core: "CASPER-3",
@@ -109,7 +116,7 @@ test("renders backend core review states without using approval colors for ready
   assert.doesNotMatch(html, /magi-system__core--agree/);
 });
 
-test("renders the reference modal fields and an accessible close control", () => {
+test("renders the core response as an open non-modal dialog with an accessible close control", () => {
   const html = renderToStaticMarkup(
     React.createElement(CoreResponseDialog, {
       open: true,
@@ -125,7 +132,8 @@ test("renders the reference modal fields and an accessible close control", () =>
     }),
   );
 
-  assert.match(html, /<dialog/);
+  assert.match(html, /<dialog[^>]* open=""/);
+  assert.doesNotMatch(html, /aria-modal="true"/);
   assert.match(html, /aria-label="Close core response"/);
   assert.match(html, /question:/);
   assert.match(html, /status:/);
@@ -143,8 +151,39 @@ test("uses the reference MAGI array as the application's core display", () => {
   assert.doesNotMatch(html, /class="core-grid"/);
   assert.match(html, /LATEST VERSION/);
   assert.doesNotMatch(html, /REMAINING REACTION ROUNDS/);
-  assert.match(html, /DECISION POLICY/);
-  assert.match(html, /value="majority" selected=""/);
-  assert.match(html, /value="unanimous"/);
-  assert.match(html, /value="human_confirm"/);
+  assert.doesNotMatch(html, /DECISION POLICY/);
+  assert.doesNotMatch(html, /<select/);
+});
+
+test("starts with the motion input instead of the console header", () => {
+  const html = renderToStaticMarkup(React.createElement(App));
+
+  assert.doesNotMatch(html, /S\.C\. MAGI \/ OPERATIONAL CONSOLE/);
+  assert.doesNotMatch(html, /TRI-CORE DECISION SUPPORT/);
+  assert.doesNotMatch(html, /LOCAL STREAM/);
+  assert.doesNotMatch(html, /PUBLIC TRACE ONLY/);
+  assert.match(html, /01 \/ MOTION INPUT/);
+});
+
+test("renders one motion input with the deliberation action beside it", () => {
+  const html = renderToStaticMarkup(React.createElement(App));
+
+  assert.equal((html.match(/<textarea/g) ?? []).length, 1);
+  assert.match(html, /id="motion-question"/);
+  assert.doesNotMatch(html, /id="motion-context"/);
+  assert.doesNotMatch(html, /name="context"/);
+  assert.match(html, /class="form-actions"/);
+  assert.match(html, /RUN DELIBERATION/);
+});
+
+test("omits the motion note and console footer while retaining input validation", () => {
+  const html = renderToStaticMarkup(React.createElement(App));
+
+  assert.doesNotMatch(html, /REQUIRED \/ 3–2,000 CHARACTERS/);
+  assert.doesNotMatch(html, /PUBLIC ACTS EXCLUDE PRIVATE REASONING CONTENT/);
+  assert.doesNotMatch(html, /NO REAL-WORLD ACTIONS EXECUTED/);
+  assert.doesNotMatch(html, /<footer/);
+  assert.match(html, /minLength="3"/);
+  assert.match(html, /maxLength="2000"/);
+  assert.match(html, /required=""/);
 });

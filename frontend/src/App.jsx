@@ -38,8 +38,6 @@ function isRunning(status) {
 
 export default function App() {
   const [question, setQuestion] = useState("");
-  const [context, setContext] = useState("");
-  const [quorum, setQuorum] = useState("majority");
   const [submittedQuestion, setSubmittedQuestion] = useState("");
   const [selectedCore, setSelectedCore] = useState(null);
   const [session, setSession] = useState(() => createSession());
@@ -86,8 +84,6 @@ export default function App() {
     controllerRef.current?.abort();
     controllerRef.current = null;
     setQuestion("");
-    setContext("");
-    setQuorum("majority");
     setSubmittedQuestion("");
     setSelectedCore(null);
     setSession(createSession());
@@ -103,7 +99,7 @@ export default function App() {
     const controller = new AbortController();
     controllerRef.current = controller;
     const startedAt = Date.now();
-    const motion = { question: question.trim(), context: context.trim(), quorum };
+    const motion = { question: question.trim() };
     setSubmittedQuestion(motion.question);
     setSelectedCore(null);
     setSession(createSession(startedAt));
@@ -184,30 +180,12 @@ export default function App() {
   return (
     <main className="console-shell" aria-busy={isRunning(session.status)}>
       <div className="console-frame">
-        <header className="console-header">
-          <div className="console-mark" aria-label="S.C. MAGI">
-            <span className="console-mark__shape" aria-hidden="true">
-              ◇
-            </span>
-            <div>
-              <p className="micro-label">S.C. MAGI / OPERATIONAL CONSOLE</p>
-              <h1>TRI-CORE DECISION SUPPORT</h1>
-            </div>
-          </div>
-          <div className="console-header__meta">
-            <span>LOCAL STREAM</span>
-            <span className="header-rule" aria-hidden="true" />
-            <span>PUBLIC TRACE ONLY</span>
-          </div>
-        </header>
-
         <section className="motion-section" aria-labelledby="motion-heading">
           <div className="section-heading">
             <div>
               <p className="eyebrow">01 / MOTION INPUT</p>
               <h2 id="motion-heading">Submit a question to the three cores.</h2>
             </div>
-            <span className="required-note">REQUIRED / 3–2,000 CHARACTERS</span>
           </div>
           <form className="motion-form" onSubmit={handleSubmit}>
             <label htmlFor="motion-question">
@@ -224,36 +202,6 @@ export default function App() {
                 disabled={isRunning(session.status)}
                 rows={3}
               />
-            </label>
-            <label htmlFor="motion-context">
-              <span className="field-label">CONTEXT <span>(OPTIONAL)</span></span>
-              <textarea
-                id="motion-context"
-                name="context"
-                value={context}
-                onChange={(event) => setContext(event.target.value)}
-                placeholder="Facts or constraints the cores should weigh."
-                maxLength={8000}
-                disabled={isRunning(session.status)}
-                rows={3}
-              />
-            </label>
-            <label className="motion-policy" htmlFor="motion-quorum">
-              <span className="field-label">DECISION POLICY</span>
-              <select
-                id="motion-quorum"
-                name="quorum"
-                value={quorum}
-                onChange={(event) => setQuorum(event.target.value)}
-                disabled={isRunning(session.status)}
-              >
-                <option value="majority">MAJORITY</option>
-                <option value="unanimous">UNANIMOUS</option>
-                <option value="human_confirm">HUMAN CONFIRMATION</option>
-              </select>
-              <span className="field-help">
-                Select explicitly; the system never infers stakes from the motion text.
-              </span>
             </label>
             <div className="form-actions">
               <button type="submit" disabled={isRunning(session.status)}>
@@ -410,11 +358,6 @@ export default function App() {
           </section>
         ) : null}
 
-        <footer className="console-footer">
-          <span>PUBLIC ACTS EXCLUDE PRIVATE REASONING CONTENT</span>
-          <span>NO REAL-WORLD ACTIONS EXECUTED</span>
-          <span>SC / 03</span>
-        </footer>
       </div>
     </main>
   );

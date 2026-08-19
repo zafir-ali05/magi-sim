@@ -61,7 +61,8 @@ function CoreButton({ core, state, speaking, onSelectCore }) {
     <button
       type="button"
       className={`magi-system__core magi-system__core--${meta.className} magi-system__core--${state.key}${speakingClass}`}
-      aria-label={`${meta.name} ${meta.order}: ${state.english}`}
+      title="Click for status"
+      aria-label={`${meta.name} ${meta.order}: ${state.english}. Click for status`}
       onClick={() => onSelectCore(core)}
     >
       <span className="magi-system__core-inner">

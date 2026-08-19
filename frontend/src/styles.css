@@ -44,7 +44,6 @@ body {
 }
 
 button,
-select,
 textarea {
   font: inherit;
 }
@@ -54,7 +53,6 @@ button {
 }
 
 button:focus-visible,
-select:focus-visible,
 textarea:focus-visible {
   outline: 3px solid #fff4dc;
   outline-offset: 3px;
@@ -68,8 +66,8 @@ textarea:focus-visible {
 
 .console-frame {
   position: relative;
-  width: min(1240px, 100%);
-  margin: 0 auto;
+  width: 100%;
+  min-height: calc(100vh - 16px);
   border: var(--magi-line) solid var(--magi-amber);
   padding: 10px;
   color: var(--magi-amber);
@@ -90,44 +88,15 @@ textarea:focus-visible {
   z-index: 1;
 }
 
-.console-header,
 .motion-section,
 .status-strip,
 .cores-section,
 .transcript-section,
-.result-section,
-.console-footer {
+.result-section {
   margin: 0;
   padding: 18px 12px;
 }
 
-.console-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 18px;
-  border-bottom: 1px solid var(--magi-amber-dim);
-}
-
-.console-mark {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.console-mark__shape {
-  display: grid;
-  width: 38px;
-  height: 38px;
-  place-items: center;
-  border: var(--magi-line) solid var(--magi-amber);
-  color: var(--magi-amber);
-  font-family: var(--magi-serif);
-  font-size: 1.4rem;
-  line-height: 1;
-}
-
-.console-header h1,
 .section-heading h2 {
   margin: 0;
   color: var(--magi-amber);
@@ -138,18 +107,10 @@ textarea:focus-visible {
   text-transform: uppercase;
 }
 
-.console-header h1 {
-  font-size: 1.3rem;
-}
-
-.micro-label,
 .eyebrow,
 .field-label,
 .status-grid dt,
-.console-header__meta,
-.section-side-note,
-.required-note,
-.console-footer {
+.section-side-note {
   margin: 0;
   color: var(--magi-amber);
   font-family: var(--magi-mono);
@@ -158,25 +119,6 @@ textarea:focus-visible {
   letter-spacing: 0.08em;
   line-height: 1.4;
   text-transform: uppercase;
-}
-
-.micro-label {
-  margin-bottom: 3px;
-  color: var(--magi-amber-light);
-}
-
-.console-header__meta {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding-top: 5px;
-  white-space: nowrap;
-}
-
-.header-rule {
-  width: 28px;
-  height: 2px;
-  background: var(--magi-header-green);
 }
 
 .motion-section,
@@ -208,7 +150,6 @@ textarea:focus-visible {
   margin-bottom: 5px;
 }
 
-.required-note,
 .section-side-note {
   color: var(--magi-amber-light);
   text-align: right;
@@ -216,7 +157,7 @@ textarea:focus-visible {
 
 .motion-form {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 4fr) minmax(0, 1fr);
   gap: 12px;
 }
 
@@ -225,11 +166,6 @@ textarea:focus-visible {
   min-width: 0;
   flex-direction: column;
   gap: 6px;
-}
-
-.motion-policy {
-  grid-column: 1 / -1;
-  width: min(30rem, 100%);
 }
 
 .field-label span {
@@ -251,29 +187,11 @@ textarea {
   line-height: 1.5;
 }
 
-select {
-  width: 100%;
-  border: 1px solid var(--magi-amber);
-  border-radius: 0;
-  padding: 10px;
-  color: #ffe0ad;
-  background: var(--magi-black);
-  font-size: 0.8rem;
-  letter-spacing: 0.05em;
-}
-
-.field-help {
-  color: #a96d26;
-  font-size: 0.7rem;
-  line-height: 1.4;
-}
-
 textarea::placeholder {
   color: #bc7826;
   opacity: 1;
 }
 
-select:disabled,
 textarea:disabled {
   cursor: not-allowed;
   border-color: var(--magi-amber-dim);
@@ -282,8 +200,10 @@ textarea:disabled {
 
 .form-actions {
   display: flex;
-  grid-column: 1 / -1;
+  min-height: 5.5rem;
+  align-self: end;
   align-items: center;
+  justify-content: center;
   gap: 10px;
 }
 
@@ -735,21 +655,23 @@ textarea:disabled {
 }
 
 .core-response-dialog {
+  position: fixed;
+  z-index: 10;
+  top: 50%;
+  left: 50%;
   width: min(60rem, calc(100vw - 2rem));
   max-width: none;
   max-height: calc(100dvh - 2rem);
-  margin: auto;
+  margin: 0;
   overflow: hidden;
+  transform: translate(-50%, -50%);
   border: var(--magi-line) solid var(--magi-amber);
   border-radius: 0;
   padding: 0;
   color: var(--magi-amber);
   background: var(--magi-black);
+  box-shadow: 0 18px 60px rgb(0 0 0 / 85%);
   font-family: var(--magi-mono);
-}
-
-.core-response-dialog::backdrop {
-  background: rgb(0 0 0 / 86%);
 }
 
 .core-response-dialog__header {
@@ -960,14 +882,6 @@ textarea:disabled {
   color: #c58538;
   font-size: 0.74rem;
   line-height: 1.5;
-}
-
-.console-footer {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 8px 20px;
-  color: #c5751d;
 }
 
 .sr-only {

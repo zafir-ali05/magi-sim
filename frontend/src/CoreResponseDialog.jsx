@@ -1,35 +1,20 @@
-import React, { useEffect, useId, useRef } from "react";
+import React, { useEffect, useId } from "react";
 
 export function CoreResponseDialog({ open = false, model = null, onClose = () => {} }) {
-  const dialogRef = useRef(null);
-  const returnFocusRef = useRef(null);
   const titleId = useId();
 
   useEffect(() => {
-    const dialog = dialogRef.current;
-    if (!dialog) return;
+    if (!open) return undefined;
 
-    if (open && !dialog.open) {
-      returnFocusRef.current = document.activeElement;
-      dialog.showModal();
-    }
-    if (!open && dialog.open) {
-      dialog.close();
-      returnFocusRef.current?.focus();
-    }
-  }, [open]);
+    const handleKeyDown = (event) => {
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      onClose();
+    };
 
-  const handleCancel = (event) => {
-    event.preventDefault();
-    onClose();
-  };
-
-  const handleKeyDown = (event) => {
-    if (event.key !== "Escape") return;
-    event.preventDefault();
-    event.stopPropagation();
-    onClose();
-  };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
 
   if (!model) return null;
 
@@ -43,11 +28,9 @@ export function CoreResponseDialog({ open = false, model = null, onClose = () =>
 
   return (
     <dialog
-      ref={dialogRef}
+      open={open}
       className="core-response-dialog"
       aria-labelledby={titleId}
-      onCancel={handleCancel}
-      onKeyDown={handleKeyDown}
     >
       <header className="core-response-dialog__header">
         <h2 id={titleId}>{model.title}</h2>
