@@ -3,10 +3,13 @@ from collections import defaultdict, deque
 
 import pytest
 
+from magi.budgets import DiscussionLimits
+from magi.deepseek import Generation, TokenUsage
 from magi.models import Act, Ballot, Motion
 
 
 CORES = ("MELCHIOR-1", "BALTHASAR-2", "CASPER-3")
+ZERO_USAGE = TokenUsage(0, 0, 0, 0)
 
 
 def make_act(core: str, kind: str, content: str, reply_to: int | None = None) -> Act:
@@ -75,6 +78,10 @@ class QueuedAsk:
         self.reaction_snapshots: list[tuple[str, int, str]] = []
         self.ballot_snapshots: dict[str, str] = {}
         self.completed_ballots: list[str] = []
+        self.opening_usage = ZERO_USAGE
+        self.reaction_usage = ZERO_USAGE
+        self.ballot_usage = ZERO_USAGE
+        self.opening_delay = 0.0
 
     async def __call__(self, core, messages, schema, effort, max_tokens):
         prompt = messages[1]["content"]
@@ -83,9 +90,9 @@ class QueuedAsk:
             self.opening_calls.append(core)
             self.opening_active += 1
             self.max_opening_active = max(self.max_opening_active, self.opening_active)
-            await asyncio.sleep(0)
+            await asyncio.sleep(self.opening_delay)
             self.opening_active -= 1
-            return self.opening_values[core].popleft()
+            return Generation(self.opening_values[core].popleft(), self.opening_usage)
 
         if schema is Act and "Review the motion and the numbered frozen transcript" in prompt:
             remaining_rounds = int(
@@ -97,7 +104,7 @@ class QueuedAsk:
             )[0]
             self.reaction_calls[core] += 1
             self.reaction_snapshots.append((core, round_number, transcript))
-            return self.reaction_values[core].popleft()
+            return Generation(self.reaction_values[core].popleft(), self.reaction_usage)
 
         if schema is Ballot and "Cast your private final ballot" in prompt:
             transcript = prompt.split("FINAL FROZEN TRANSCRIPT:\n", 1)[1].split(
@@ -105,7 +112,7 @@ class QueuedAsk:
             )[0]
             self.ballot_snapshots[core] = transcript
             self.completed_ballots.append(core)
-            return self.ballot_values[core].popleft()
+            return Generation(self.ballot_values[core].popleft(), self.ballot_usage)
 
         raise AssertionError(f"unexpected request for {core}: {prompt}")
 
@@ -207,6 +214,89 @@ async def test_public_reaction_records_the_frozen_transcript_version():
     assert acts[-1].act.reply_to == 1
     assert all("[PASS]" not in snapshot for _, _, snapshot in fake.reaction_snapshots)
     assert all("[READY]" not in snapshot for _, _, snapshot in fake.reaction_snapshots)
+
+
+@pytest.mark.asyncio
+async def test_total_token_budget_stops_new_reaction_rounds_but_still_ballots():
+    from magi.deliberation import deliberate
+
+    fake = QueuedAsk(ready_round=None)
+    fake.reaction_usage = TokenUsage(1, 3, 1, 4)
+    limits = DiscussionLimits(max_total_tokens=10)
+
+    events = [
+        event
+        async for event in deliberate(
+            Motion(question="Should it proceed?"),
+            ask=fake,
+            limits=limits,
+        )
+    ]
+
+    assert dict(fake.reaction_calls) == {core: 1 for core in CORES}
+    assert len(fake.ballot_snapshots) == 3
+    assert any(event.type == "result" for event in events)
+
+
+@pytest.mark.asyncio
+async def test_discussion_timeout_starts_after_openings_finish():
+    from magi.deliberation import deliberate
+
+    fake = QueuedAsk(ready_round=1)
+    fake.opening_delay = 0.08
+    limits = DiscussionLimits(timeout_seconds=0.02)
+
+    events = [
+        event
+        async for event in deliberate(
+            Motion(question="Should it proceed?"),
+            ask=fake,
+            limits=limits,
+        )
+    ]
+
+    assert dict(fake.reaction_calls) == {core: 1 for core in CORES}
+    assert any(event.type == "result" for event in events)
+
+
+@pytest.mark.asyncio
+async def test_per_core_evaluation_and_contribution_limits_are_enforced():
+    from magi.deliberation import deliberate
+
+    evaluation_fake = QueuedAsk(ready_round=None)
+    evaluation_limits = DiscussionLimits(max_evaluations_per_core=1)
+    evaluation_events = [
+        event
+        async for event in deliberate(
+            Motion(question="Should it proceed?"),
+            ask=evaluation_fake,
+            limits=evaluation_limits,
+        )
+    ]
+
+    assert dict(evaluation_fake.reaction_calls) == {core: 1 for core in CORES}
+    assert any(event.type == "result" for event in evaluation_events)
+
+    contribution_fake = QueuedAsk(ready_round=None)
+    for core in CORES:
+        contribution_fake.reaction_values[core] = deque(
+            make_act(core, "CLARIFY", f"public review {number} from {core}")
+            for number in range(1, 4)
+        )
+    contribution_limits = DiscussionLimits(max_contributions_per_core=1)
+    contribution_events = [
+        event
+        async for event in deliberate(
+            Motion(question="Should it proceed?"),
+            ask=contribution_fake,
+            limits=contribution_limits,
+        )
+    ]
+
+    public_acts = [event for event in contribution_events if event.type == "act"]
+    assert [event.act.core for event in public_acts].count("MELCHIOR-1") == 2
+    assert [event.act.core for event in public_acts].count("BALTHASAR-2") == 2
+    assert [event.act.core for event in public_acts].count("CASPER-3") == 2
 
 
 @pytest.mark.asyncio

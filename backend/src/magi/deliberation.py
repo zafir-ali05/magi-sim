@@ -4,7 +4,8 @@ import asyncio
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from typing import Any, Literal, TypeVar, cast
 
-from .deepseek import ask_deepseek
+from .budgets import BudgetLedger, DiscussionLimits
+from .deepseek import Generation, TokenUsage, ask_deepseek
 from .models import (
     Act,
     Ballot,
@@ -40,7 +41,7 @@ class _DeliberationFailure(Exception):
 T = TypeVar("T", Act, Ballot)
 Ask = Callable[
     [CoreId, list[dict[str, str]], type[T], Literal["high", "max"], int],
-    Awaitable[T],
+    Awaitable[Generation[T]],
 ]
 
 
@@ -62,24 +63,26 @@ async def _request(
     schema: type[T],
     effort: Literal["high", "max"],
     max_tokens: int,
-) -> T:
+) -> Generation[T]:
     try:
-        value = await ask(core, messages, schema, effort, max_tokens)
+        generation = await ask(core, messages, schema, effort, max_tokens)
     except asyncio.CancelledError:
         raise
     except Exception:
         raise _DeliberationFailure from None
-    return _validated(value, schema, core)
+    if not isinstance(generation, Generation) or not isinstance(generation.usage, TokenUsage):
+        raise _DeliberationFailure
+    return Generation(_validated(generation.value, schema, core), generation.usage)
 
 
 async def _gather(
-    requests: Sequence[Awaitable[T]],
-) -> list[T]:
+    requests: Sequence[Awaitable[Generation[T]]],
+) -> list[Generation[T]]:
     responses = await asyncio.gather(*requests, return_exceptions=True)
     for response in responses:
         if isinstance(response, BaseException):
             raise _DeliberationFailure from None
-    return cast(list[T], responses)
+    return cast(list[Generation[T]], responses)
 
 
 def _reduce_ballots(ballots: Sequence[Ballot]) -> Literal[
@@ -104,11 +107,15 @@ def _deduplicate_conditions(ballots: Sequence[Ballot]) -> list[str]:
     return conditions
 
 
-async def _run_deliberation(motion: Motion, ask: Ask) -> AsyncIterator[StreamEvent]:
+async def _run_deliberation(
+    motion: Motion,
+    ask: Ask,
+    limits: DiscussionLimits,
+) -> AsyncIterator[StreamEvent]:
     transcript = Transcript()
 
     yield PhaseEvent(phase="OPENING", active_cores=list(CORE_ORDER))
-    openings = await _gather(
+    opening_generations = await _gather(
         [
             _request(
                 ask,
@@ -121,14 +128,23 @@ async def _run_deliberation(motion: Motion, ask: Ask) -> AsyncIterator[StreamEve
             for core in CORE_ORDER
         ]
     )
-    for act in openings:
+    budgets = BudgetLedger(limits)
+    for generation in opening_generations:
+        budgets.record_usage(generation.usage)
+        act = generation.value
         yield transcript.append(act, seen_through_event_id=0)
 
     yield PhaseEvent(phase="DISCUSSION", active_cores=list(CORE_ORDER))
     for round_number in range(1, MAX_REACTION_ROUNDS + 1):
+        if budgets.discussion_expired():
+            break
+        eligible_cores = [core for core in CORE_ORDER if budgets.can_evaluate(core)]
+        if not eligible_cores:
+            break
+
         frozen_transcript = transcript.snapshot()
         remaining_rounds = MAX_REACTION_ROUNDS - round_number
-        reactions = await _gather(
+        reaction_generations = await _gather(
             [
                 _request(
                     ask,
@@ -138,21 +154,31 @@ async def _run_deliberation(motion: Motion, ask: Ask) -> AsyncIterator[StreamEve
                     "high",
                     4096,
                 )
-                for core in CORE_ORDER
+                for core in eligible_cores
             ]
         )
-        for act in reactions:
-            if act.kind not in {"PASS", "READY"}:
+        reactions: list[Act] = []
+        for core, generation in zip(eligible_cores, reaction_generations, strict=True):
+            budgets.record_evaluation(core, generation.usage)
+            act = generation.value
+            reactions.append(act)
+            if (
+                act.kind not in {"PASS", "READY"}
+                and budgets.remaining_contributions(core) > 0
+            ):
+                budgets.record_contribution(core)
                 yield transcript.append(
                     act,
                     seen_through_event_id=frozen_transcript.version,
                 )
-        if all(act.kind == "READY" for act in reactions):
+        if len(reactions) == len(CORE_ORDER) and all(
+            act.kind == "READY" for act in reactions
+        ):
             break
 
     yield PhaseEvent(phase="BALLOTING", active_cores=list(CORE_ORDER))
     frozen_transcript = transcript.freeze()
-    ballots = await _gather(
+    ballot_generations = await _gather(
         [
             _request(
                 ask,
@@ -165,6 +191,9 @@ async def _run_deliberation(motion: Motion, ask: Ask) -> AsyncIterator[StreamEve
             for core in CORE_ORDER
         ]
     )
+    for generation in ballot_generations:
+        budgets.record_usage(generation.usage)
+    ballots = [generation.value for generation in ballot_generations]
 
     yield BallotsLockedEvent()
     yield ResultEvent(
@@ -178,12 +207,17 @@ async def _run_deliberation(motion: Motion, ask: Ask) -> AsyncIterator[StreamEve
 async def deliberate(
     motion: Motion,
     ask: Ask = ask_deepseek,
+    limits: DiscussionLimits | None = None,
 ) -> AsyncIterator[StreamEvent]:
     """Stream one bounded MAGI deliberation with private final ballots."""
 
     try:
         async with asyncio.timeout(DELIBERATION_TIMEOUT_SECONDS):
-            async for event in _run_deliberation(motion, ask):
+            async for event in _run_deliberation(
+                motion,
+                ask,
+                limits or DiscussionLimits(),
+            ):
                 yield event
     except asyncio.CancelledError:
         raise

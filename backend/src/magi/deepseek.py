@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Literal, TypeVar
+from dataclasses import dataclass
+from typing import Any, Generic, Literal, TypeVar
 
 from openai import AsyncOpenAI
 from pydantic import BaseModel
@@ -11,6 +12,28 @@ from .models import CoreId
 
 
 T = TypeVar("T", bound=BaseModel)
+
+
+@dataclass(frozen=True)
+class TokenUsage:
+    prompt_tokens: int
+    completion_tokens: int
+    reasoning_tokens: int
+    total_tokens: int
+
+    def __add__(self, other: TokenUsage) -> TokenUsage:
+        return TokenUsage(
+            prompt_tokens=self.prompt_tokens + other.prompt_tokens,
+            completion_tokens=self.completion_tokens + other.completion_tokens,
+            reasoning_tokens=self.reasoning_tokens + other.reasoning_tokens,
+            total_tokens=self.total_tokens + other.total_tokens,
+        )
+
+
+@dataclass(frozen=True)
+class Generation(Generic[T]):
+    value: T
+    usage: TokenUsage
 
 
 class DeepSeekError(RuntimeError):
@@ -25,17 +48,12 @@ class _AttemptFailure(Exception):
     """Internal failure carrying only a sanitized explanation."""
 
 
-def _account_usage(response: Any) -> dict[str, int]:
+def _account_usage(response: Any) -> TokenUsage:
     """Read aggregate usage, including private reasoning tokens, then discard it."""
 
     usage = getattr(response, "usage", None)
     if usage is None:
-        return {
-            "prompt_tokens": 0,
-            "completion_tokens": 0,
-            "reasoning_tokens": 0,
-            "total_tokens": 0,
-        }
+        return TokenUsage(0, 0, 0, 0)
 
     aggregate: dict[str, int] = {}
     for field in ("prompt_tokens", "completion_tokens", "total_tokens"):
@@ -45,7 +63,12 @@ def _account_usage(response: Any) -> dict[str, int]:
     details = getattr(usage, "completion_tokens_details", None)
     reasoning_tokens = getattr(details, "reasoning_tokens", 0)
     aggregate["reasoning_tokens"] = reasoning_tokens if isinstance(reasoning_tokens, int) else 0
-    return aggregate
+    return TokenUsage(
+        prompt_tokens=aggregate["prompt_tokens"],
+        completion_tokens=aggregate["completion_tokens"],
+        reasoning_tokens=aggregate["reasoning_tokens"],
+        total_tokens=aggregate["total_tokens"],
+    )
 
 
 def _response_content(response: Any) -> str:
@@ -88,7 +111,7 @@ async def ask_deepseek(
     schema: type[T],
     effort: Literal["high", "max"],
     max_tokens: int,
-) -> T:
+) -> Generation[T]:
     """Request and validate one public response from an independent MAGI core."""
 
     key = os.environ.get("DEEPSEEK_API_KEY")
@@ -100,12 +123,7 @@ async def ask_deepseek(
         base_url="https://api.deepseek.com",
         max_retries=0,
     )
-    usage_totals = {
-        "prompt_tokens": 0,
-        "completion_tokens": 0,
-        "reasoning_tokens": 0,
-        "total_tokens": 0,
-    }
+    usage_totals = TokenUsage(0, 0, 0, 0)
     failure = "provider request failed"
 
     for attempt in range(2):
@@ -118,10 +136,9 @@ async def ask_deepseek(
                 response_format={"type": "json_object"},
                 max_tokens=max_tokens,
             )
-            for field, value in _account_usage(response).items():
-                usage_totals[field] += value
+            usage_totals += _account_usage(response)
             result = _parse_response(_response_content(response), schema, core)
-            return result
+            return Generation(result, usage_totals)
         except _AttemptFailure as exc:
             failure = str(exc)
         except Exception:

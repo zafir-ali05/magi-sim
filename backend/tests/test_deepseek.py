@@ -64,7 +64,11 @@ async def test_request_uses_fixed_thinking_json_configuration(monkeypatch):
     assert request["response_format"] == {"type": "json_object"}
     assert request["max_tokens"] == 4096
     assert "temperature" not in request
-    assert result == Probe(core="MELCHIOR-1", content="ok")
+    assert result.value == Probe(core="MELCHIOR-1", content="ok")
+    assert result.usage.prompt_tokens == 11
+    assert result.usage.completion_tokens == 17
+    assert result.usage.reasoning_tokens == 9
+    assert result.usage.total_tokens == 28
 
 
 @pytest.mark.asyncio
@@ -85,8 +89,26 @@ async def test_malformed_response_is_retried_once(monkeypatch):
             4096,
         )
 
-    assert result.content == "recovered"
+    assert result.value.content == "recovered"
+    assert result.usage.total_tokens == 56
+    assert result.usage.reasoning_tokens == 18
     assert client.chat.completions.create.await_count == 2
+
+
+@pytest.mark.asyncio
+async def test_missing_provider_usage_returns_zero_counts(monkeypatch):
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "sk-test-secret")
+    response = provider_response(json.dumps({"core": "MELCHIOR-1", "content": "ok"}))
+    response.usage = None
+    client = configured_client(response)
+
+    with patch("magi.deepseek.AsyncOpenAI", return_value=client):
+        result = await ask_deepseek("MELCHIOR-1", [], Probe, "high", 4096)
+
+    assert result.usage.prompt_tokens == 0
+    assert result.usage.completion_tokens == 0
+    assert result.usage.reasoning_tokens == 0
+    assert result.usage.total_tokens == 0
 
 
 @pytest.mark.asyncio
