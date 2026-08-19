@@ -3,7 +3,7 @@ import json
 from fastapi.testclient import TestClient
 
 from magi import app as app_module
-from magi.models import Act, ActEvent, PhaseEvent
+from magi.models import Act, ActEvent, CoreStatusEvent, PhaseEvent
 
 
 def test_discuss_streams_ordered_compact_ndjson_without_private_values(monkeypatch):
@@ -15,8 +15,13 @@ def test_discuss_streams_ordered_compact_ndjson_without_private_values(monkeypat
         PhaseEvent(phase="OPENING", active_cores=["MELCHIOR-1"]),
         ActEvent(
             id=1,
-            round=0,
+            seen_through_event_id=0,
             act=Act(core="MELCHIOR-1", kind="POSITION", content="Proceed carefully."),
+        ),
+        CoreStatusEvent(
+            core="MELCHIOR-1",
+            status="LISTENING",
+            reviewed_through_event_id=1,
         ),
         PhaseEvent(phase="BALLOTING", active_cores=[]),
     ]
@@ -43,6 +48,7 @@ def test_discuss_streams_ordered_compact_ndjson_without_private_values(monkeypat
     assert [payload["type"] for payload in payloads] == [
         "phase",
         "act",
+        "core_status",
         "phase",
     ]
     assert [payload["phase"] for payload in payloads if payload["type"] == "phase"] == [
@@ -50,6 +56,9 @@ def test_discuss_streams_ordered_compact_ndjson_without_private_values(monkeypat
         "BALLOTING",
     ]
     assert all(line == line.strip() for line in lines)
+    act_payload = next(payload for payload in payloads if payload["type"] == "act")
+    assert act_payload["seen_through_event_id"] == 0
+    assert "round" not in act_payload
     assert private_reasoning not in response.text
     assert "reasoning_content" not in response.text
     assert api_key not in response.text

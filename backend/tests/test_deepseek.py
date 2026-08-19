@@ -167,7 +167,7 @@ def test_prompt_transcripts_number_validated_acts_only():
         Act(core="MELCHIOR-1", kind="POSITION", content="first claim"),
         ActEvent(
             id=2,
-            round=1,
+            seen_through_event_id=1,
             act=Act(core="BALTHASAR-2", kind="CHALLENGE", content="second claim"),
         ),
     ]

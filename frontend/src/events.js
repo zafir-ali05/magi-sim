@@ -12,6 +12,14 @@ const ACT_KINDS = [
 const VOTES = ["AGREE", "DISAGREE", "CONDITIONAL"];
 const PHASES = ["OPENING", "DISCUSSION", "BALLOTING"];
 const OUTCOMES = ["APPROVED", "APPROVED_WITH_CONDITIONS", "REJECTED"];
+const CORE_STATUSES = [
+  "LISTENING",
+  "THINKING",
+  "SPEAKING",
+  "READY",
+  "BUDGET_EXHAUSTED",
+  "FAILED",
+];
 
 export class StreamProtocolError extends Error {
   constructor(message) {
@@ -90,12 +98,12 @@ function parsePhase(value) {
 
 function parseAct(value) {
   if (!isRecord(value)) fail("act event must be an object.");
-  exactKeys(value, ["type", "id", "round", "act"], "act event");
-  if (!Number.isInteger(value.id)) {
-    fail("id must be an integer.");
+  exactKeys(value, ["type", "id", "seen_through_event_id", "act"], "act event");
+  if (!Number.isInteger(value.id) || value.id < 1) {
+    fail("id must be a positive integer.");
   }
-  if (!Number.isInteger(value.round)) {
-    fail("round must be an integer.");
+  if (!Number.isInteger(value.seen_through_event_id) || value.seen_through_event_id < 0) {
+    fail("seen_through_event_id must be a non-negative integer.");
   }
   if (!isRecord(value.act)) fail("act must be an object.");
 
@@ -107,15 +115,45 @@ function parseAct(value) {
     content: stringField(act, "content", { minLength: 1, maxLength: 2000 }),
   };
   if (act.reply_to !== undefined && act.reply_to !== null) {
-    if (!Number.isInteger(act.reply_to)) {
-      fail("act.reply_to must be null or an integer.");
+    if (
+      !Number.isInteger(act.reply_to) ||
+      act.reply_to < 1 ||
+      act.reply_to > value.seen_through_event_id
+    ) {
+      fail("act.reply_to must reference a visible positive event id.");
     }
     parsedAct.reply_to = act.reply_to;
   } else {
     parsedAct.reply_to = null;
   }
 
-  return { type: "act", id: value.id, round: value.round, act: parsedAct };
+  return {
+    type: "act",
+    id: value.id,
+    seen_through_event_id: value.seen_through_event_id,
+    act: parsedAct,
+  };
+}
+
+function parseCoreStatus(value) {
+  if (!isRecord(value)) fail("core_status event must be an object.");
+  exactKeys(
+    value,
+    ["type", "core", "status", "reviewed_through_event_id"],
+    "core_status event",
+  );
+  if (
+    !Number.isInteger(value.reviewed_through_event_id) ||
+    value.reviewed_through_event_id < 0
+  ) {
+    fail("reviewed_through_event_id must be a non-negative integer.");
+  }
+  return {
+    type: "core_status",
+    core: coreId(value.core),
+    status: oneOf(value.status, CORE_STATUSES, "status"),
+    reviewed_through_event_id: value.reviewed_through_event_id,
+  };
 }
 
 function parseBallot(value, index) {
@@ -181,6 +219,8 @@ export function parseStreamEvent(value) {
       return parsePhase(value);
     case "act":
       return parseAct(value);
+    case "core_status":
+      return parseCoreStatus(value);
     case "ballots_locked":
       exactKeys(value, ["type"], "ballots_locked event");
       return { type: "ballots_locked" };

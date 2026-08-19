@@ -34,7 +34,7 @@ test("parseStreamEvent accepts acts, ballot lock, result, and error events", () 
     parseStreamEvent({
       type: "act",
       id: 1,
-      round: 0,
+      seen_through_event_id: 0,
       act: {
         core: "MELCHIOR-1",
         kind: "POSITION",
@@ -47,6 +47,20 @@ test("parseStreamEvent accepts acts, ballot lock, result, and error events", () 
       kind: "POSITION",
       content: "The evidence is sufficient to compare both options.",
       reply_to: null,
+    },
+  );
+  assert.deepEqual(
+    parseStreamEvent({
+      type: "core_status",
+      core: "CASPER-3",
+      status: "THINKING",
+      reviewed_through_event_id: 3,
+    }),
+    {
+      type: "core_status",
+      core: "CASPER-3",
+      status: "THINKING",
+      reviewed_through_event_id: 3,
     },
   );
   assert.deepEqual(parseStreamEvent({ type: "ballots_locked" }), { type: "ballots_locked" });
@@ -102,7 +116,7 @@ test("parseStreamEvent rejects unsupported top-level and nested keys", () => {
       parseStreamEvent({
         type: "act",
         id: 1,
-        round: 0,
+        seen_through_event_id: 0,
         act: {
           core: "MELCHIOR-1",
           kind: "POSITION",
@@ -129,7 +143,7 @@ test("parseStreamEvent mirrors public content and ballot condition bounds", () =
       parseStreamEvent({
         type: "act",
         id: 1,
-        round: 0,
+        seen_through_event_id: 0,
         act: {
           core: "MELCHIOR-1",
           kind: "POSITION",
@@ -214,6 +228,34 @@ test("parseStreamEvent mirrors public content and ballot condition bounds", () =
         disclaimer: "Decision support only.",
       }),
     /conditions.*8/i,
+  );
+});
+
+test("parseStreamEvent rejects invalid causal and core status fields", () => {
+  assert.throws(
+    () =>
+      parseStreamEvent({
+        type: "act",
+        id: 1,
+        seen_through_event_id: -1,
+        act: {
+          core: "MELCHIOR-1",
+          kind: "POSITION",
+          content: "A public position.",
+          reply_to: null,
+        },
+      }),
+    /seen_through_event_id/i,
+  );
+  assert.throws(
+    () =>
+      parseStreamEvent({
+        type: "core_status",
+        core: "CASPER-3",
+        status: "PRIVATE_REASONING",
+        reviewed_through_event_id: 3,
+      }),
+    /status/i,
   );
 });
 

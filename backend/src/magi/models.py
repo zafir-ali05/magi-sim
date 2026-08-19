@@ -17,6 +17,14 @@ ActKind = Literal[
     "PASS",
 ]
 Vote = Literal["AGREE", "DISAGREE", "CONDITIONAL"]
+CoreStatus = Literal[
+    "LISTENING",
+    "THINKING",
+    "SPEAKING",
+    "READY",
+    "BUDGET_EXHAUSTED",
+    "FAILED",
+]
 
 
 class _PublicModel(BaseModel):
@@ -51,9 +59,16 @@ class PhaseEvent(_PublicModel):
 
 class ActEvent(_PublicModel):
     type: Literal["act"] = "act"
-    id: int
-    round: int
+    id: int = Field(ge=1)
+    seen_through_event_id: int = Field(ge=0)
     act: Act
+
+
+class CoreStatusEvent(_PublicModel):
+    type: Literal["core_status"] = "core_status"
+    core: CoreId
+    status: CoreStatus
+    reviewed_through_event_id: int = Field(ge=0)
 
 
 class BallotsLockedEvent(_PublicModel):
@@ -73,4 +88,11 @@ class ErrorEvent(_PublicModel):
     message: str
 
 
-StreamEvent = PhaseEvent | ActEvent | BallotsLockedEvent | ResultEvent | ErrorEvent
+StreamEvent = (
+    PhaseEvent
+    | ActEvent
+    | CoreStatusEvent
+    | BallotsLockedEvent
+    | ResultEvent
+    | ErrorEvent
+)

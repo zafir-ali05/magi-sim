@@ -8,7 +8,7 @@ const COMPLETE_DISCUSSION = [
   {
     type: "act",
     id: 1,
-    round: 0,
+    seen_through_event_id: 0,
     act: {
       core: "MELCHIOR-1",
       kind: "POSITION",
@@ -19,7 +19,7 @@ const COMPLETE_DISCUSSION = [
   {
     type: "act",
     id: 2,
-    round: 0,
+    seen_through_event_id: 0,
     act: {
       core: "BALTHASAR-2",
       kind: "POSITION",
@@ -30,7 +30,7 @@ const COMPLETE_DISCUSSION = [
   {
     type: "act",
     id: 3,
-    round: 0,
+    seen_through_event_id: 0,
     act: {
       core: "CASPER-3",
       kind: "CHALLENGE",
@@ -40,9 +40,15 @@ const COMPLETE_DISCUSSION = [
   },
   { type: "phase", phase: "DISCUSSION", active_cores: CORES },
   {
+    type: "core_status",
+    core: "CASPER-3",
+    status: "THINKING",
+    reviewed_through_event_id: 3,
+  },
+  {
     type: "act",
     id: 4,
-    round: 1,
+    seen_through_event_id: 3,
     act: {
       core: "MELCHIOR-1",
       kind: "RESPONSE",
@@ -53,7 +59,7 @@ const COMPLETE_DISCUSSION = [
   {
     type: "act",
     id: 5,
-    round: 1,
+    seen_through_event_id: 3,
     act: {
       core: "BALTHASAR-2",
       kind: "PROPOSE_CONDITION",
@@ -64,10 +70,10 @@ const COMPLETE_DISCUSSION = [
   {
     type: "act",
     id: 6,
-    round: 1,
+    seen_through_event_id: 5,
     act: {
       core: "CASPER-3",
-      kind: "PASS",
+      kind: "CLARIFY",
       content: "The new conditions clarify the risk, but I still oppose proceeding now.",
       reply_to: 5,
     },

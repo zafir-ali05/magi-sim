@@ -11,6 +11,7 @@ test("createSession marks a started request active before the first stream event
   assert.equal(session.phase, "CONNECTING");
   assert.equal(session.startedAt, startedAt);
   assert.equal(session.elapsedMs, 0);
+  assert.equal("round" in session, false);
 });
 
 test("createSession without a request timestamp remains in standby", () => {

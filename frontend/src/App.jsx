@@ -6,7 +6,6 @@ import { MagiCoreArray } from "./MagiCoreArray.jsx";
 import { buildCoreDialogModel } from "./magiVisualState.js";
 import { createSession } from "./session.js";
 
-const MAX_REACTION_ROUNDS = 3;
 const SPEAKER_CUE_MS = 1000;
 
 function formatElapsed(milliseconds) {
@@ -80,7 +79,6 @@ export default function App() {
             ...current,
             status: "running",
             acts: [...current.acts, event],
-            round: Math.max(current.round, event.round),
           };
         case "ballots_locked":
           return {
@@ -205,12 +203,7 @@ export default function App() {
     }
   };
 
-  const roundsRemaining =
-    session.phase === "OPENING"
-      ? MAX_REACTION_ROUNDS
-      : session.phase === "DISCUSSION"
-        ? Math.max(0, MAX_REACTION_ROUNDS - session.round)
-        : 0;
+  const latestEventId = session.acts.at(-1)?.id ?? 0;
 
   const selectedBallot =
     selectedCore && session.result
@@ -324,12 +317,12 @@ export default function App() {
               </dd>
             </div>
             <div>
-              <dt>ROUND</dt>
-              <dd>{session.phase === "DISCUSSION" ? `${session.round} / ${MAX_REACTION_ROUNDS}` : "—"}</dd>
+              <dt>PUBLIC ACTS</dt>
+              <dd>{session.acts.length}</dd>
             </div>
             <div>
-              <dt>REMAINING REACTION ROUNDS</dt>
-              <dd>{session.phase === "OPENING" || session.phase === "DISCUSSION" ? roundsRemaining : "—"}</dd>
+              <dt>LATEST VERSION</dt>
+              <dd>{latestEventId || "—"}</dd>
             </div>
           </dl>
         </section>
@@ -364,7 +357,7 @@ export default function App() {
             ballotsLocked={session.ballotsLocked}
             result={session.result}
             elapsedMs={session.elapsedMs}
-            round={session.round}
+            latestEventId={latestEventId}
             onSelectCore={setSelectedCore}
           />
         </section>
@@ -392,7 +385,7 @@ export default function App() {
                   <li key={event.id} className={`transcript-entry transcript-entry--${event.act.core.toLowerCase()}`}>
                     <div className="transcript-entry__meta">
                       <span>ACT {event.id.toString().padStart(2, "0")}</span>
-                      <span>R{event.round}</span>
+                      <span>SEEN {event.seen_through_event_id}</span>
                       <span>{event.act.core}</span>
                       <span className="transcript-entry__kind">{event.act.kind}</span>
                     </div>

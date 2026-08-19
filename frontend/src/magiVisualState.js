@@ -133,7 +133,10 @@ function publicActLines(acts, core) {
   if (!Array.isArray(acts)) return [];
   return acts
     .filter((event) => event?.act?.core === core)
-    .map((event) => `R${event.round} ${event.act.kind}: ${event.act.content}`);
+    .map(
+      (event) =>
+        `SEEN ${event.seen_through_event_id} ${event.act.kind}: ${event.act.content}`,
+    );
 }
 
 export function buildCoreDialogModel({

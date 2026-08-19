@@ -5,7 +5,6 @@ export function createSession(startedAt = null) {
     phase: active ? "CONNECTING" : "STANDBY",
     activeCores: [],
     acts: [],
-    round: 0,
     ballotsLocked: false,
     ballots: null,
     result: null,

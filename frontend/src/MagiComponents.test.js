@@ -29,7 +29,7 @@ function renderArray(overrides = {}) {
       ballotsLocked: false,
       result: null,
       elapsedMs: 0,
-      round: 0,
+      latestEventId: 0,
       onSelectCore() {},
       ...overrides,
     }),
@@ -43,6 +43,8 @@ test("renders the reference headers and three polygon cores in canonical visual 
   assert.match(html, /解決/);
   assert.match(html, /CODE:473/);
   assert.match(html, /FILE:MAGI_SYS/);
+  assert.match(html, /VERSION:0/);
+  assert.doesNotMatch(html, /ROUND:/);
   assert.match(html, /MAGI/);
   assert.equal((html.match(/<button/g) ?? []).length, 3);
 
@@ -102,7 +104,7 @@ test("renders the reference modal fields and an accessible close control", () =>
         status: "agree",
         error: "—",
         conditions: "Retain oversight.",
-        fullResponse: "R0 POSITION: Yes.\n\nFINAL RATIONALE: Simple math, but important.",
+        fullResponse: "SEEN 0 POSITION: Yes.\n\nFINAL RATIONALE: Simple math, but important.",
         ballotLocked: false,
       },
       onClose() {},
@@ -125,4 +127,6 @@ test("uses the reference MAGI array as the application's core display", () => {
   assert.match(html, /class="magi-system"/);
   assert.match(html, /BALTHASAR • 2/);
   assert.doesNotMatch(html, /class="core-grid"/);
+  assert.match(html, /LATEST VERSION/);
+  assert.doesNotMatch(html, /REMAINING REACTION ROUNDS/);
 });

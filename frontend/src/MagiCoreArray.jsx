@@ -29,13 +29,13 @@ function ReferenceHeader({ side, title }) {
   );
 }
 
-function SystemDiagnostics({ phase, round, elapsedMs }) {
+function SystemDiagnostics({ phase, latestEventId, elapsedMs }) {
   return (
     <div className="magi-system__diagnostics" aria-label="System diagnostics">
       <div>CODE:473</div>
       <div>FILE:MAGI_SYS</div>
       <div>PHASE:{phase}</div>
-      <div>ROUND:{round || 0}</div>
+      <div>VERSION:{latestEventId || 0}</div>
       <div>TIME:{formatElapsed(elapsedMs)}</div>
     </div>
   );
@@ -81,7 +81,7 @@ export function MagiCoreArray({
   ballotsLocked = false,
   result = null,
   elapsedMs = 0,
-  round = 0,
+  latestEventId = 0,
   onSelectCore = () => {},
 }) {
   const publicBallots = result && Array.isArray(ballots) ? ballots : [];
@@ -93,7 +93,11 @@ export function MagiCoreArray({
         <div className="magi-system__stage">
           <ReferenceHeader side="left" title="質問" />
           <ReferenceHeader side="right" title="解決" />
-          <SystemDiagnostics phase={phase} round={round} elapsedMs={elapsedMs} />
+          <SystemDiagnostics
+            phase={phase}
+            latestEventId={latestEventId}
+            elapsedMs={elapsedMs}
+          />
           <SystemResponse state={systemState} />
 
           <span

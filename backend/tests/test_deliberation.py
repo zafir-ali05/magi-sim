@@ -135,14 +135,14 @@ async def test_deliberation_barriers_and_private_ballots():
         snapshot.count("[POSITION]") == 3 and "[READY]" not in snapshot
         for _, _, snapshot in reaction_snapshots
     )
-    assert [event.round for event in act_events] == [0, 0, 0, 1, 1, 1]
-    assert [event.id for event in act_events] == list(range(1, 7))
+    assert [event.seen_through_event_id for event in act_events] == [0, 0, 0]
+    assert [event.id for event in act_events] == [1, 2, 3]
 
     ballot_transcripts = list(fake.ballot_snapshots.values())
     assert len(ballot_transcripts) == 3
     assert len(set(ballot_transcripts)) == 1
     assert ballot_transcripts[0].count("[POSITION]") == 3
-    assert ballot_transcripts[0].count("[READY]") == 3
+    assert "[READY]" not in ballot_transcripts[0]
 
     event_types = [event.type for event in events]
     assert event_types.index("ballots_locked") > max(
@@ -180,21 +180,33 @@ async def test_deliberation_reacts_at_most_three_rounds_before_balloting():
         ]
         assert len(snapshots) == 3
         assert all(snapshot.count("[POSITION]") == 3 for snapshot in snapshots)
-        assert all(snapshot.count("[PASS]") == 3 * (round_number - 1) for snapshot in snapshots)
-    assert [event.round for event in events if event.type == "act"] == [
-        0,
-        0,
-        0,
-        1,
-        1,
-        1,
-        2,
-        2,
-        2,
-        3,
-        3,
-        3,
+        assert all("[PASS]" not in snapshot for snapshot in snapshots)
+    assert [event.seen_through_event_id for event in events if event.type == "act"] == [0, 0, 0]
+
+
+@pytest.mark.asyncio
+async def test_public_reaction_records_the_frozen_transcript_version():
+    from magi.deliberation import deliberate
+
+    fake = QueuedAsk(ready_round=2)
+    fake.reaction_values["CASPER-3"][0] = make_act(
+        "CASPER-3",
+        "CHALLENGE",
+        "The opening evidence remains incomplete.",
+        reply_to=1,
+    )
+
+    events = [
+        event
+        async for event in deliberate(Motion(question="Should it proceed?"), ask=fake)
     ]
+    acts = [event for event in events if event.type == "act"]
+
+    assert [event.id for event in acts] == [1, 2, 3, 4]
+    assert [event.seen_through_event_id for event in acts] == [0, 0, 0, 3]
+    assert acts[-1].act.reply_to == 1
+    assert all("[PASS]" not in snapshot for _, _, snapshot in fake.reaction_snapshots)
+    assert all("[READY]" not in snapshot for _, _, snapshot in fake.reaction_snapshots)
 
 
 @pytest.mark.asyncio

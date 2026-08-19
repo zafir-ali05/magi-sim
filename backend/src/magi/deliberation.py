@@ -7,7 +7,6 @@ from typing import Any, Literal, TypeVar, cast
 from .deepseek import ask_deepseek
 from .models import (
     Act,
-    ActEvent,
     Ballot,
     BallotsLockedEvent,
     CoreId,
@@ -18,6 +17,7 @@ from .models import (
     StreamEvent,
 )
 from .prompts import ballot_messages, opening_messages, reaction_messages
+from .transcript import Transcript
 
 
 CORE_ORDER: tuple[CoreId, ...] = (
@@ -82,18 +82,6 @@ async def _gather(
     return cast(list[T], responses)
 
 
-def _commit(
-    transcript: list[ActEvent],
-    act: Act,
-    *,
-    act_id: int,
-    round_number: int,
-) -> ActEvent:
-    event = ActEvent(id=act_id, round=round_number, act=act)
-    transcript.append(event)
-    return event
-
-
 def _reduce_ballots(ballots: Sequence[Ballot]) -> Literal[
     "APPROVED", "APPROVED_WITH_CONDITIONS", "REJECTED"
 ]:
@@ -117,8 +105,7 @@ def _deduplicate_conditions(ballots: Sequence[Ballot]) -> list[str]:
 
 
 async def _run_deliberation(motion: Motion, ask: Ask) -> AsyncIterator[StreamEvent]:
-    transcript: list[ActEvent] = []
-    next_id = 1
+    transcript = Transcript()
 
     yield PhaseEvent(phase="OPENING", active_cores=list(CORE_ORDER))
     openings = await _gather(
@@ -135,19 +122,18 @@ async def _run_deliberation(motion: Motion, ask: Ask) -> AsyncIterator[StreamEve
         ]
     )
     for act in openings:
-        yield _commit(transcript, act, act_id=next_id, round_number=0)
-        next_id += 1
+        yield transcript.append(act, seen_through_event_id=0)
 
     yield PhaseEvent(phase="DISCUSSION", active_cores=list(CORE_ORDER))
     for round_number in range(1, MAX_REACTION_ROUNDS + 1):
-        frozen_transcript = tuple(transcript)
+        frozen_transcript = transcript.snapshot()
         remaining_rounds = MAX_REACTION_ROUNDS - round_number
         reactions = await _gather(
             [
                 _request(
                     ask,
                     core,
-                    reaction_messages(core, motion, frozen_transcript, remaining_rounds),
+                    reaction_messages(core, motion, frozen_transcript.events, remaining_rounds),
                     Act,
                     "high",
                     4096,
@@ -156,24 +142,22 @@ async def _run_deliberation(motion: Motion, ask: Ask) -> AsyncIterator[StreamEve
             ]
         )
         for act in reactions:
-            yield _commit(
-                transcript,
-                act,
-                act_id=next_id,
-                round_number=round_number,
-            )
-            next_id += 1
+            if act.kind not in {"PASS", "READY"}:
+                yield transcript.append(
+                    act,
+                    seen_through_event_id=frozen_transcript.version,
+                )
         if all(act.kind == "READY" for act in reactions):
             break
 
     yield PhaseEvent(phase="BALLOTING", active_cores=list(CORE_ORDER))
-    frozen_transcript = tuple(transcript)
+    frozen_transcript = transcript.freeze()
     ballots = await _gather(
         [
             _request(
                 ask,
                 core,
-                ballot_messages(core, motion, frozen_transcript),
+                ballot_messages(core, motion, frozen_transcript.events),
                 Ballot,
                 "max",
                 8192,

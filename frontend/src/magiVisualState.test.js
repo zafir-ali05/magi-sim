@@ -138,7 +138,7 @@ test("builds a locked dialog from public acts without leaking private fields", (
     acts: [
       {
         id: 4,
-        round: 1,
+        seen_through_event_id: 3,
         act: {
           core: CORE,
           kind: "CHALLENGE",
@@ -149,7 +149,7 @@ test("builds a locked dialog from public acts without leaking private fields", (
       },
       {
         id: 5,
-        round: 1,
+        seen_through_event_id: 4,
         act: { core: "MELCHIOR-1", kind: "RESPONSE", content: "Another core." },
       },
     ],
@@ -164,7 +164,7 @@ test("builds a locked dialog from public acts without leaking private fields", (
     status: "vote sealed",
     error: "—",
     conditions: "—",
-    fullResponse: "R1 CHALLENGE: Public objection.\n\nVote sealed until all cores report.",
+    fullResponse: "SEEN 3 CHALLENGE: Public objection.\n\nVote sealed until all cores report.",
     ballotLocked: true,
   });
   assert.doesNotMatch(JSON.stringify(model), /private act reasoning|private event reasoning|reasoning_content/);
@@ -179,7 +179,7 @@ test("adds only a revealed ballot's public rationale and conditions", () => {
     acts: [
       {
         id: 1,
-        round: 0,
+        seen_through_event_id: 0,
         act: { core: CORE, kind: "POSITION", content: "Proceed cautiously." },
       },
     ],
@@ -198,7 +198,7 @@ test("adds only a revealed ballot's public rationale and conditions", () => {
   assert.equal(model.conditions, "Publish the review.\nRetain a rollback path.");
   assert.equal(
     model.fullResponse,
-    "R0 POSITION: Proceed cautiously.\n\nFINAL RATIONALE: Proceed if the safeguards remain reversible.",
+    "SEEN 0 POSITION: Proceed cautiously.\n\nFINAL RATIONALE: Proceed if the safeguards remain reversible.",
   );
   assert.doesNotMatch(JSON.stringify(model), /private ballot reasoning|reasoning_content/);
 });
