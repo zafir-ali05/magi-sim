@@ -156,7 +156,10 @@ async def test_deliberation_barriers_and_private_ballots():
         index for index, event_type in enumerate(event_types) if event_type == "act"
     )
     result = next(event for event in events if event.type == "result")
+    assert result.quorum == "majority"
+    assert result.recommendation == "APPROVED_WITH_CONDITIONS"
     assert result.outcome == "APPROVED_WITH_CONDITIONS"
+    assert not result.requires_human_confirmation
     assert [ballot.vote for ballot in result.ballots] == [
         "AGREE",
         "CONDITIONAL",
@@ -165,6 +168,26 @@ async def test_deliberation_barriers_and_private_ballots():
     assert result.conditions == ["audit"]
     assert result.ballots[2].rationale == "dissent remains material"
     assert "decision support" in result.disclaimer.lower()
+
+
+@pytest.mark.asyncio
+async def test_deliberation_applies_the_motion_decision_policy():
+    from magi.deliberation import deliberate
+
+    fake = QueuedAsk(ready_round=1)
+    events = [
+        event
+        async for event in deliberate(
+            Motion(question="Should the pilot proceed?", quorum="unanimous"),
+            ask=fake,
+        )
+    ]
+
+    result = next(event for event in events if event.type == "result")
+    assert result.quorum == "unanimous"
+    assert result.recommendation == "APPROVED_WITH_CONDITIONS"
+    assert result.outcome == "REJECTED"
+    assert not result.requires_human_confirmation
 
 
 @pytest.mark.asyncio

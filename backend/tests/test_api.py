@@ -28,6 +28,7 @@ def test_discuss_streams_ordered_compact_ndjson_without_private_values(monkeypat
 
     async def fake_deliberate(motion):
         assert motion.question == "Should the pilot proceed?"
+        assert motion.quorum == "unanimous"
         for event in events:
             yield event
 
@@ -36,7 +37,7 @@ def test_discuss_streams_ordered_compact_ndjson_without_private_values(monkeypat
     with TestClient(app_module.app) as client:
         response = client.post(
             "/api/discuss",
-            json={"question": "Should the pilot proceed?"},
+            json={"question": "Should the pilot proceed?", "quorum": "unanimous"},
         )
 
     assert response.status_code == 200
@@ -67,6 +68,16 @@ def test_discuss_streams_ordered_compact_ndjson_without_private_values(monkeypat
 def test_discuss_rejects_two_character_question():
     with TestClient(app_module.app) as client:
         response = client.post("/api/discuss", json={"question": "No"})
+
+    assert response.status_code == 422
+
+
+def test_discuss_rejects_unknown_decision_policy():
+    with TestClient(app_module.app) as client:
+        response = client.post(
+            "/api/discuss",
+            json={"question": "Should the pilot proceed?", "quorum": "plurality"},
+        )
 
     assert response.status_code == 422
 

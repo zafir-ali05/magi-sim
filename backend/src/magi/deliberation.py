@@ -7,6 +7,7 @@ from typing import Any, Literal, TypeVar, cast
 from .budgets import BudgetLedger, DiscussionLimits
 from .deepseek import Generation, TokenUsage, ask_deepseek
 from .models import (
+    CORE_ORDER,
     Act,
     Ballot,
     BallotsLockedEvent,
@@ -17,15 +18,11 @@ from .models import (
     ResultEvent,
     StreamEvent,
 )
+from .policy import reduce_ballots
 from .prompts import ballot_messages, opening_messages, reaction_messages
 from .transcript import Transcript
 
 
-CORE_ORDER: tuple[CoreId, ...] = (
-    "MELCHIOR-1",
-    "BALTHASAR-2",
-    "CASPER-3",
-)
 MAX_REACTION_ROUNDS = 3
 DELIBERATION_TIMEOUT_SECONDS = 5 * 60
 SANITIZED_ERROR_MESSAGE = "Deliberation could not be completed."
@@ -83,28 +80,6 @@ async def _gather(
         if isinstance(response, BaseException):
             raise _DeliberationFailure from None
     return cast(list[Generation[T]], responses)
-
-
-def _reduce_ballots(ballots: Sequence[Ballot]) -> Literal[
-    "APPROVED", "APPROVED_WITH_CONDITIONS", "REJECTED"
-]:
-    affirmative = sum(ballot.vote in {"AGREE", "CONDITIONAL"} for ballot in ballots)
-    if affirmative < 2:
-        return "REJECTED"
-    if any(ballot.vote == "CONDITIONAL" for ballot in ballots):
-        return "APPROVED_WITH_CONDITIONS"
-    return "APPROVED"
-
-
-def _deduplicate_conditions(ballots: Sequence[Ballot]) -> list[str]:
-    conditions: list[str] = []
-    seen: set[str] = set()
-    for ballot in ballots:
-        for condition in ballot.conditions:
-            if condition not in seen:
-                seen.add(condition)
-                conditions.append(condition)
-    return conditions
 
 
 async def _run_deliberation(
@@ -194,12 +169,16 @@ async def _run_deliberation(
     for generation in ballot_generations:
         budgets.record_usage(generation.usage)
     ballots = [generation.value for generation in ballot_generations]
+    decision = reduce_ballots(motion.quorum, ballots)
 
     yield BallotsLockedEvent()
     yield ResultEvent(
-        outcome=_reduce_ballots(ballots),
+        quorum=motion.quorum,
+        recommendation=decision.recommendation,
+        outcome=decision.outcome,
+        requires_human_confirmation=decision.requires_human_confirmation,
         ballots=ballots,
-        conditions=_deduplicate_conditions(ballots),
+        conditions=list(decision.conditions),
         disclaimer=DISCLAIMER,
     )
 

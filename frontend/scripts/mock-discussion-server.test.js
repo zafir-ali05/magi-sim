@@ -23,6 +23,10 @@ test("provides a complete mixed-ballot discussion for browser verification", () 
   assert.equal(acts.some((event) => "round" in event), false);
   assert.equal(events.some((event) => event.type === "core_status"), true);
   assert.equal(events.at(-2).type, "ballots_locked");
+  assert.equal(events.at(-1).quorum, "majority");
+  assert.equal(events.at(-1).recommendation, "APPROVED_WITH_CONDITIONS");
+  assert.equal(events.at(-1).outcome, "APPROVED_WITH_CONDITIONS");
+  assert.equal(events.at(-1).requires_human_confirmation, false);
   assert.deepEqual(events.at(-1).ballots.map((ballot) => ballot.vote), [
     "AGREE",
     "CONDITIONAL",

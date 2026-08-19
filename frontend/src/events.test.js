@@ -66,7 +66,10 @@ test("parseStreamEvent accepts acts, ballot lock, result, and error events", () 
   assert.deepEqual(parseStreamEvent({ type: "ballots_locked" }), { type: "ballots_locked" });
   const result = parseStreamEvent({
     type: "result",
+    quorum: "majority",
+    recommendation: "APPROVED_WITH_CONDITIONS",
     outcome: "APPROVED_WITH_CONDITIONS",
+    requires_human_confirmation: false,
     ballots: [
       {
         core: "MELCHIOR-1",
@@ -94,6 +97,9 @@ test("parseStreamEvent accepts acts, ballot lock, result, and error events", () 
     disclaimer: "Decision support only.",
   });
   assert.equal(result.ballots.length, 3);
+  assert.equal(result.quorum, "majority");
+  assert.equal(result.recommendation, "APPROVED_WITH_CONDITIONS");
+  assert.equal(result.requires_human_confirmation, false);
   assert.deepEqual(parseStreamEvent({ type: "error", message: "Deliberation failed." }), {
     type: "error",
     message: "Deliberation failed.",
@@ -157,7 +163,10 @@ test("parseStreamEvent mirrors public content and ballot condition bounds", () =
     () =>
       parseStreamEvent({
         type: "result",
+        quorum: "majority",
+        recommendation: "APPROVED",
         outcome: "APPROVED",
+        requires_human_confirmation: false,
         ballots: [
           {
             core: "MELCHIOR-1",
@@ -190,7 +199,10 @@ test("parseStreamEvent mirrors public content and ballot condition bounds", () =
     () =>
       parseStreamEvent({
         type: "result",
+        quorum: "majority",
+        recommendation: "APPROVED",
         outcome: "APPROVED",
+        requires_human_confirmation: false,
         ballots: [
           {
             core: "MELCHIOR-1",
@@ -257,6 +269,71 @@ test("parseStreamEvent rejects invalid causal and core status fields", () => {
       }),
     /status/i,
   );
+});
+
+test("parseStreamEvent rejects invalid decision policy fields", () => {
+  const result = {
+    type: "result",
+    quorum: "majority",
+    recommendation: "APPROVED",
+    outcome: "APPROVED",
+    requires_human_confirmation: false,
+    ballots: [
+      {
+        core: "MELCHIOR-1",
+        vote: "AGREE",
+        confidence: 0.8,
+        rationale: "A valid rationale.",
+        conditions: [],
+      },
+      {
+        core: "BALTHASAR-2",
+        vote: "AGREE",
+        confidence: 0.8,
+        rationale: "A valid rationale.",
+        conditions: [],
+      },
+      {
+        core: "CASPER-3",
+        vote: "AGREE",
+        confidence: 0.8,
+        rationale: "A valid rationale.",
+        conditions: [],
+      },
+    ],
+    conditions: [],
+    disclaimer: "Decision support only.",
+  };
+
+  assert.throws(() => parseStreamEvent({ ...result, quorum: "plurality" }), /quorum/i);
+  assert.throws(
+    () => parseStreamEvent({ ...result, recommendation: "MAYBE" }),
+    /recommendation/i,
+  );
+  assert.throws(
+    () => parseStreamEvent({ ...result, outcome: "EXECUTED" }),
+    /outcome/i,
+  );
+  assert.throws(
+    () => parseStreamEvent({ ...result, requires_human_confirmation: "no" }),
+    /requires_human_confirmation/i,
+  );
+});
+
+test("parseStreamEvent accepts an incomplete result without revealing partial ballots", () => {
+  const result = parseStreamEvent({
+    type: "result",
+    quorum: "unanimous",
+    recommendation: "INCOMPLETE",
+    outcome: "INCOMPLETE",
+    requires_human_confirmation: true,
+    ballots: [],
+    conditions: [],
+    disclaimer: "Decision support only.",
+  });
+
+  assert.deepEqual(result.ballots, []);
+  assert.equal(result.outcome, "INCOMPLETE");
 });
 
 test("unknown event errors do not echo an untrusted type value", () => {

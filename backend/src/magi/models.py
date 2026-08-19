@@ -6,6 +6,11 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 CoreId = Literal["MELCHIOR-1", "BALTHASAR-2", "CASPER-3"]
+CORE_ORDER: tuple[CoreId, ...] = (
+    "MELCHIOR-1",
+    "BALTHASAR-2",
+    "CASPER-3",
+)
 ActKind = Literal[
     "POSITION",
     "CHALLENGE",
@@ -17,6 +22,20 @@ ActKind = Literal[
     "PASS",
 ]
 Vote = Literal["AGREE", "DISAGREE", "CONDITIONAL"]
+DecisionPolicy = Literal["majority", "unanimous", "human_confirm"]
+Recommendation = Literal[
+    "APPROVED",
+    "APPROVED_WITH_CONDITIONS",
+    "REJECTED",
+    "INCOMPLETE",
+]
+DecisionOutcome = Literal[
+    "APPROVED",
+    "APPROVED_WITH_CONDITIONS",
+    "REJECTED",
+    "HUMAN_CONFIRMATION_REQUIRED",
+    "INCOMPLETE",
+]
 CoreStatus = Literal[
     "LISTENING",
     "THINKING",
@@ -34,6 +53,7 @@ class _PublicModel(BaseModel):
 class Motion(_PublicModel):
     question: str = Field(min_length=3, max_length=2_000)
     context: str = Field(default="", max_length=8_000)
+    quorum: DecisionPolicy = "majority"
 
 
 class Act(_PublicModel):
@@ -77,7 +97,10 @@ class BallotsLockedEvent(_PublicModel):
 
 class ResultEvent(_PublicModel):
     type: Literal["result"] = "result"
-    outcome: Literal["APPROVED", "APPROVED_WITH_CONDITIONS", "REJECTED"]
+    quorum: DecisionPolicy
+    recommendation: Recommendation
+    outcome: DecisionOutcome
+    requires_human_confirmation: bool
     ballots: list[Ballot]
     conditions: list[str]
     disclaimer: str

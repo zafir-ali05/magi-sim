@@ -82,7 +82,10 @@ const COMPLETE_DISCUSSION = [
   { type: "ballots_locked" },
   {
     type: "result",
+    quorum: "majority",
+    recommendation: "APPROVED_WITH_CONDITIONS",
     outcome: "APPROVED_WITH_CONDITIONS",
+    requires_human_confirmation: false,
     ballots: [
       {
         core: "MELCHIOR-1",

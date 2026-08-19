@@ -11,7 +11,15 @@ const ACT_KINDS = [
 ];
 const VOTES = ["AGREE", "DISAGREE", "CONDITIONAL"];
 const PHASES = ["OPENING", "DISCUSSION", "BALLOTING"];
-const OUTCOMES = ["APPROVED", "APPROVED_WITH_CONDITIONS", "REJECTED"];
+const DECISION_POLICIES = ["majority", "unanimous", "human_confirm"];
+const RECOMMENDATIONS = ["APPROVED", "APPROVED_WITH_CONDITIONS", "REJECTED", "INCOMPLETE"];
+const OUTCOMES = [
+  "APPROVED",
+  "APPROVED_WITH_CONDITIONS",
+  "REJECTED",
+  "HUMAN_CONFIRMATION_REQUIRED",
+  "INCOMPLETE",
+];
 const CORE_STATUSES = [
   "LISTENING",
   "THINKING",
@@ -186,13 +194,33 @@ function parseBallot(value, index) {
 
 function parseResult(value) {
   if (!isRecord(value)) fail("result event must be an object.");
-  exactKeys(value, ["type", "outcome", "ballots", "conditions", "disclaimer"], "result event");
+  exactKeys(
+    value,
+    [
+      "type",
+      "quorum",
+      "recommendation",
+      "outcome",
+      "requires_human_confirmation",
+      "ballots",
+      "conditions",
+      "disclaimer",
+    ],
+    "result event",
+  );
+  const outcome = oneOf(value.outcome, OUTCOMES, "outcome");
   const ballots = requiredArray(value, "ballots").map(parseBallot);
-  if (ballots.length !== CORE_IDS.length) {
+  if (outcome === "INCOMPLETE" && ballots.length !== 0) {
+    fail("incomplete result must not reveal partial ballots.");
+  }
+  if (outcome !== "INCOMPLETE" && ballots.length !== CORE_IDS.length) {
     fail("result ballots must contain all three cores.");
   }
   const ballotCores = new Set(ballots.map((ballot) => ballot.core));
-  if (ballotCores.size !== CORE_IDS.length || CORE_IDS.some((core) => !ballotCores.has(core))) {
+  if (
+    outcome !== "INCOMPLETE" &&
+    (ballotCores.size !== CORE_IDS.length || CORE_IDS.some((core) => !ballotCores.has(core)))
+  ) {
     fail("result ballots must contain one ballot for each core.");
   }
   const conditions = requiredArray(value, "conditions").map((condition, index) => {
@@ -201,9 +229,15 @@ function parseResult(value) {
     }
     return condition;
   });
+  if (typeof value.requires_human_confirmation !== "boolean") {
+    fail("requires_human_confirmation must be a boolean.");
+  }
   return {
     type: "result",
-    outcome: oneOf(value.outcome, OUTCOMES, "outcome"),
+    quorum: oneOf(value.quorum, DECISION_POLICIES, "quorum"),
+    recommendation: oneOf(value.recommendation, RECOMMENDATIONS, "recommendation"),
+    outcome,
+    requires_human_confirmation: value.requires_human_confirmation,
     ballots,
     conditions,
     disclaimer: stringField(value, "disclaimer"),
