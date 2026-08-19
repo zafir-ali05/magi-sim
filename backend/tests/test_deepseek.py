@@ -6,8 +6,9 @@ import pytest
 from pydantic import BaseModel
 
 from magi.deepseek import DeepSeekError, ask_deepseek
-from magi.models import Act, ActEvent, Ballot, Motion
+from magi.models import Act, Ballot, Motion
 from magi.prompts import ballot_messages, opening_messages, reaction_messages
+from magi.transcript import Transcript
 
 
 class Probe(BaseModel):
@@ -185,19 +186,33 @@ def test_prompt_transcripts_reject_private_or_unknown_objects(transcript):
 
 def test_prompt_transcripts_number_validated_acts_only():
     motion = Motion(question="Proceed?")
-    transcript = [
+    transcript = Transcript()
+    transcript.append(
         Act(core="MELCHIOR-1", kind="POSITION", content="first claim"),
-        ActEvent(
-            id=2,
-            seen_through_event_id=1,
-            act=Act(core="BALTHASAR-2", kind="CHALLENGE", content="second claim"),
-        ),
-    ]
+        seen_through_event_id=0,
+    )
+    transcript.append(
+        Act(core="BALTHASAR-2", kind="CHALLENGE", content="second claim", reply_to=1),
+        seen_through_event_id=1,
+    )
 
-    prompt = reaction_messages("CASPER-3", motion, transcript, 2)[1]["content"]
+    prompt = reaction_messages(
+        "CASPER-3",
+        motion,
+        transcript.snapshot(),
+        last_reviewed_event_id=1,
+        remaining_contributions=2,
+        remaining_evaluations=4,
+        currently_ready=False,
+    )[1]["content"]
 
     assert "1. MELCHIOR-1 [POSITION] first claim" in prompt
     assert "2. BALTHASAR-2 [CHALLENGE] second claim" in prompt
+    assert "SHARED TRANSCRIPT VERSION: 2" in prompt
+    assert "NEWLY VISIBLE EVENT RANGE: 2..2" in prompt
+    assert "Remaining public contributions: 2" in prompt
+    assert "Remaining review evaluations: 4" in prompt
+    assert "A direct reply is optional" in prompt
 
 
 @pytest.mark.parametrize(

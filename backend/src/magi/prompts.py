@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 
 from .models import Act, ActEvent, CoreId, Motion
+from .transcript import FrozenTranscript
 
 
 Message = dict[str, str]
@@ -125,7 +126,7 @@ Never reveal hidden reasoning, private analysis, or provider reasoning_content.
 Use only the motion and transcript supplied here; do not invent evidence or citations.
 Evaluate the proposed decision; do not help carry out wrongdoing or provide operational details that increase harm, coercion, deception, or evasion.
 Do not manufacture disagreement merely to perform your identity. Agree, concede, or pass when the motion and transcript warrant it.
-Keep public statements under 120 words. Address a concrete peer claim by its number when peer claims are present; never manufacture a peer claim.
+Keep public statements under 120 words. You may address a concrete peer claim by its number when useful, but a direct reply is optional; never manufacture a peer claim.
 Return exactly one valid JSON object matching this example and no markdown:
 {response_example}"""
 
@@ -163,23 +164,41 @@ Required output JSON example:
 def reaction_messages(
     core: CoreId,
     motion: Motion,
-    transcript: Transcript,
-    remaining_rounds: int,
+    transcript: FrozenTranscript,
+    last_reviewed_event_id: int,
+    remaining_contributions: int,
+    remaining_evaluations: int,
+    currently_ready: bool,
 ) -> list[Message]:
-    """Build a reaction request from one numbered, frozen transcript snapshot."""
+    """Build an independent review request from one frozen shared snapshot."""
 
-    frozen = _transcript_text(transcript)
+    if not 0 <= last_reviewed_event_id <= transcript.version:
+        raise ValueError("last_reviewed_event_id must be within the transcript snapshot")
+    newly_visible = (
+        f"{last_reviewed_event_id + 1}..{transcript.version}"
+        if last_reviewed_event_id < transcript.version
+        else "none (bounded reconsideration of the current version)"
+    )
+    frozen = _transcript_text(transcript.events)
     return [
         {"role": "system", "content": _system_prompt(core, response_example=_act_example(core))},
         {
             "role": "user",
-            "content": f"""Review the motion and the numbered frozen transcript below.
-This is the only peer material visible to you for this round; respond to a concrete claim when one requires challenge, response, concession, clarification, or a condition.
-There are {remaining_rounds} reaction round(s) remaining after this request. Signal READY only when you can ballot without a material unresolved objection; use PASS if no substantive addition is warranted.
+            "content": f"""Independently review the coordinator-owned shared review record below.
+This notification means the validated shared record is available for review; it is not a direct message from another core. A direct reply is optional. You may PASS, signal READY, or publish one challenge, response, concession, clarification, or proposed condition.
+Signal READY only when you have reviewed this version and have no further public objection. READY does not mean agreement and does not reveal your private ballot. Use PASS when no public addition is warranted but you are not ready.
+
+SHARED TRANSCRIPT VERSION: {transcript.version}
+LAST REVIEWED EVENT ID: {last_reviewed_event_id}
+NEWLY VISIBLE EVENT RANGE: {newly_visible}
+Remaining public contributions: {remaining_contributions}
+Remaining review evaluations: {remaining_evaluations}
+Currently ready: {str(currently_ready).lower()}
+The coordinator, not you, records the transcript version seen when it commits a public act.
 
 {_motion_text(motion)}
 
-FROZEN TRANSCRIPT:
+SHARED REVIEW RECORD:
 {frozen}
 
 Required output JSON example:
