@@ -75,6 +75,23 @@ test("does not apply a ballot color until a public result exists", () => {
   assert.match(revealed, /magi-system__core--disagree/);
 });
 
+test("illuminates only the core whose public discussion act is being presented", () => {
+  const html = renderArray({
+    phase: "DISCUSSION",
+    sessionStatus: "running",
+    activeCores: ["MELCHIOR-1", "BALTHASAR-2", "CASPER-3"],
+    speakingCore: "MELCHIOR-1",
+  });
+
+  assert.equal((html.match(/magi-system__core--speaking/g) ?? []).length, 1);
+  assert.match(
+    html,
+    /magi-system__core--melchior[^"\n]*magi-system__core--processing[^"\n]*magi-system__core--speaking/,
+  );
+  assert.equal((html.match(/magi-system__core--listening/g) ?? []).length, 2);
+  assert.doesNotMatch(html, /magi-system__core--flicker/);
+});
+
 test("renders the reference modal fields and an accessible close control", () => {
   const html = renderToStaticMarkup(
     React.createElement(CoreResponseDialog, {

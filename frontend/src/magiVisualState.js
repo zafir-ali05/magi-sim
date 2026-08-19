@@ -7,15 +7,27 @@ const CORE_STATES = Object.freeze({
   }),
   processing: Object.freeze({
     key: "processing",
+    english: "SPEAKING",
+    japanese: "情 報",
+    flicker: false,
+  }),
+  connecting: Object.freeze({
+    key: "processing",
     english: "PROCESSING",
     japanese: "情 報",
-    flicker: true,
+    flicker: false,
+  }),
+  listening: Object.freeze({
+    key: "listening",
+    english: "LISTENING",
+    japanese: "情 報",
+    flicker: false,
   }),
   locked: Object.freeze({
     key: "locked",
     english: "VOTE SEALED",
     japanese: "情 報",
-    flicker: true,
+    flicker: false,
   }),
   agree: Object.freeze({ key: "agree", english: "AGREE", japanese: "合 意", flicker: false }),
   conditional: Object.freeze({
@@ -68,6 +80,7 @@ export function getCoreVisualState({
   phase = "STANDBY",
   sessionStatus = "idle",
   activeCores = [],
+  speakingCore = null,
   ballot = null,
   ballotsLocked = false,
 } = {}) {
@@ -78,8 +91,13 @@ export function getCoreVisualState({
 
   if (ballotsLocked || phase === "BALLOTING") return copyState(CORE_STATES.locked);
 
-  const active = phase === "CONNECTING" || activeCores.includes(core);
-  if (sessionStatus === "running" && active) return copyState(CORE_STATES.processing);
+  if (sessionStatus === "running" && phase === "CONNECTING") {
+    return copyState(CORE_STATES.connecting);
+  }
+
+  if (sessionStatus === "running" && ["OPENING", "DISCUSSION"].includes(phase)) {
+    return copyState(core === speakingCore ? CORE_STATES.processing : CORE_STATES.listening);
+  }
 
   return copyState(CORE_STATES.information);
 }
@@ -124,6 +142,7 @@ export function buildCoreDialogModel({
   phase = "STANDBY",
   sessionStatus = "idle",
   activeCores = [],
+  speakingCore = null,
   acts = [],
   ballot = null,
   ballotsLocked = false,
@@ -134,6 +153,7 @@ export function buildCoreDialogModel({
     phase,
     sessionStatus,
     activeCores,
+    speakingCore,
     acts,
     ballot,
     ballotsLocked,

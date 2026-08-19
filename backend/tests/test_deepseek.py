@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 from magi.deepseek import DeepSeekError, ask_deepseek
 from magi.models import Act, ActEvent, Ballot, Motion
-from magi.prompts import ballot_messages, reaction_messages
+from magi.prompts import ballot_messages, opening_messages, reaction_messages
 
 
 class Probe(BaseModel):
@@ -176,3 +176,50 @@ def test_prompt_transcripts_number_validated_acts_only():
 
     assert "1. MELCHIOR-1 [POSITION] first claim" in prompt
     assert "2. BALTHASAR-2 [CHALLENGE] second claim" in prompt
+
+
+@pytest.mark.parametrize(
+    ("core", "required_fragments"),
+    [
+        (
+            "MELCHIOR-1",
+            [
+                "rational, logical, and objective",
+                "Separate observations, assumptions, and value judgments",
+                "false precision",
+                "efficiency alone does not make a choice acceptable",
+            ],
+        ),
+        (
+            "BALTHASAR-2",
+            [
+                "nurturing, protective, and empathetic",
+                "consent, vulnerability, reversibility, and repair",
+                "paternalism",
+                "zero risk",
+            ],
+        ),
+        (
+            "CASPER-3",
+            [
+                "emotional, individualistic, and driven by personal desires",
+                "autonomy, loyalty, betrayal, identity, and emotional truth",
+                "automatic cynicism",
+                "Emotions reveal stakes and motives",
+            ],
+        ),
+    ],
+)
+def test_core_system_prompts_preserve_distinct_anime_facets(core, required_fragments):
+    system_prompt = opening_messages(core, Motion(question="Proceed?"))[0]["content"]
+
+    for fragment in required_fragments:
+        assert fragment in system_prompt
+
+
+def test_system_prompts_evaluate_harmful_motions_without_operationalizing_them():
+    for core in ("MELCHIOR-1", "BALTHASAR-2", "CASPER-3"):
+        system_prompt = opening_messages(core, Motion(question="Proceed?"))[0]["content"]
+
+        assert "Evaluate the proposed decision; do not help carry out wrongdoing" in system_prompt
+        assert "Do not manufacture disagreement merely to perform your identity" in system_prompt

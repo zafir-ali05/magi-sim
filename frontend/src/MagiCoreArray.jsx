@@ -53,14 +53,14 @@ function SystemResponse({ state }) {
   );
 }
 
-function CoreButton({ core, state, onSelectCore }) {
+function CoreButton({ core, state, speaking, onSelectCore }) {
   const meta = CORE_META[core];
-  const flickerClass = state.flicker ? " magi-system__core--flicker" : "";
+  const speakingClass = speaking ? " magi-system__core--speaking" : "";
 
   return (
     <button
       type="button"
-      className={`magi-system__core magi-system__core--${meta.className} magi-system__core--${state.key}${flickerClass}`}
+      className={`magi-system__core magi-system__core--${meta.className} magi-system__core--${state.key}${speakingClass}`}
       aria-label={`${meta.name} ${meta.order}: ${state.english}`}
       onClick={() => onSelectCore(core)}
     >
@@ -75,6 +75,7 @@ export function MagiCoreArray({
   phase = "STANDBY",
   sessionStatus = "idle",
   activeCores = [],
+  speakingCore = null,
   acts = [],
   ballots = null,
   ballotsLocked = false,
@@ -112,11 +113,13 @@ export function MagiCoreArray({
             <CoreButton
               key={core}
               core={core}
+              speaking={core === speakingCore}
               state={getCoreVisualState({
                 core,
                 phase,
                 sessionStatus,
                 activeCores,
+                speakingCore,
                 acts,
                 ballot: publicBallots.find((candidate) => candidate.core === core) ?? null,
                 ballotsLocked,

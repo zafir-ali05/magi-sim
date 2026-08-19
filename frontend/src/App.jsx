@@ -7,6 +7,7 @@ import { buildCoreDialogModel } from "./magiVisualState.js";
 import { createSession } from "./session.js";
 
 const MAX_REACTION_ROUNDS = 3;
+const SPEAKER_CUE_MS = 1000;
 
 function formatElapsed(milliseconds) {
   const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
@@ -37,6 +38,7 @@ export default function App() {
   const [context, setContext] = useState("");
   const [submittedQuestion, setSubmittedQuestion] = useState("");
   const [selectedCore, setSelectedCore] = useState(null);
+  const [speakingCore, setSpeakingCore] = useState(null);
   const [session, setSession] = useState(() => createSession());
   const controllerRef = useRef(null);
   const requestIdRef = useRef(0);
@@ -120,6 +122,7 @@ export default function App() {
     setContext("");
     setSubmittedQuestion("");
     setSelectedCore(null);
+    setSpeakingCore(null);
     setSession(createSession());
   };
 
@@ -136,10 +139,11 @@ export default function App() {
     const motion = { question: question.trim(), context: context.trim() };
     setSubmittedQuestion(motion.question);
     setSelectedCore(null);
+    setSpeakingCore(null);
     setSession(createSession(startedAt));
 
     let terminalEventSeen = false;
-    const processLine = (line) => {
+    const processLine = async (line) => {
       if (requestId !== requestIdRef.current) return;
       if (!line.trim()) return;
       let value;
@@ -150,6 +154,16 @@ export default function App() {
       }
       const parsed = parseStreamEvent(value);
       if (parsed.type === "result" || parsed.type === "error") terminalEventSeen = true;
+
+      if (parsed.type === "act") {
+        setSpeakingCore(parsed.act.core);
+        applyEvent(parsed);
+        await new Promise((resolve) => window.setTimeout(resolve, SPEAKER_CUE_MS));
+        if (requestId === requestIdRef.current) setSpeakingCore(null);
+        return;
+      }
+
+      if (parsed.type === "result" || parsed.type === "error") setSpeakingCore(null);
       applyEvent(parsed);
     };
 
@@ -168,15 +182,16 @@ export default function App() {
       for await (const chunk of decoded) {
         const parsedChunk = parseNdjsonChunk(remainder, chunk);
         remainder = parsedChunk.remainder;
-        for (const line of parsedChunk.lines) processLine(line);
+        for (const line of parsedChunk.lines) await processLine(line);
       }
-      if (remainder.trim()) processLine(remainder);
+      if (remainder.trim()) await processLine(remainder);
       if (!terminalEventSeen) {
         throw new StreamProtocolError("the stream ended before a final result.");
       }
     } catch (error) {
       if (requestId !== requestIdRef.current || error?.name === "AbortError") return;
       const message = protocolMessage(error);
+      setSpeakingCore(null);
       setSession((current) => ({
         ...current,
         status: "error",
@@ -208,6 +223,7 @@ export default function App() {
         phase: session.phase,
         sessionStatus: session.status,
         activeCores: session.activeCores,
+        speakingCore,
         acts: session.acts,
         ballot: selectedBallot,
         ballotsLocked: session.ballotsLocked,
@@ -342,6 +358,7 @@ export default function App() {
             phase={session.phase}
             sessionStatus={session.status}
             activeCores={session.activeCores}
+            speakingCore={speakingCore}
             acts={session.acts}
             ballots={session.result ? session.ballots : null}
             ballotsLocked={session.ballotsLocked}

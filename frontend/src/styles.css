@@ -661,20 +661,16 @@ textarea:disabled {
   background: var(--magi-black);
 }
 
-@keyframes magi-core-flicker {
-  0%,
-  49% {
-    background-color: var(--magi-info);
-  }
-
-  50%,
-  100% {
-    background-color: #061015;
-  }
+.magi-system__core--listening .magi-system__core-inner,
+.magi-system__core--locked .magi-system__core-inner {
+  color: var(--magi-info);
+  background: #061015;
 }
 
-.magi-system__core--flicker .magi-system__core-inner {
-  animation: magi-core-flicker 800ms infinite step-end;
+.magi-system__core--speaking .magi-system__core-inner {
+  color: var(--magi-black);
+  background: var(--magi-info);
+  box-shadow: inset 0 0 34px rgb(210 248 255 / 48%);
 }
 
 .magi-system__title {
@@ -908,15 +904,6 @@ textarea:disabled {
     transition-duration: 0.01ms !important;
   }
 
-  .magi-system__core--flicker .magi-system__core-inner {
-    background: repeating-linear-gradient(
-      56deg,
-      var(--magi-info) 0,
-      var(--magi-info) 20px,
-      #1d697f 20px,
-      #1d697f 40px
-    );
-  }
 }
 
 @media (max-width: 760px) {

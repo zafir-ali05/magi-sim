@@ -18,11 +18,12 @@ function coreState(overrides = {}) {
     acts: [],
     ballot: null,
     ballotsLocked: false,
+    speakingCore: null,
     ...overrides,
   };
 }
 
-test("maps public session phases to stable and processing information states", () => {
+test("maps only the current public speaker to processing during discussion", () => {
   assert.deepEqual(getCoreVisualState(coreState()), {
     key: "information",
     english: "INFORMATION",
@@ -36,37 +37,32 @@ test("maps public session phases to stable and processing information states", (
       key: "processing",
       english: "PROCESSING",
       japanese: "情 報",
-      flicker: true,
+      flicker: false,
     },
   );
 
-  assert.equal(
+  assert.deepEqual(
     getCoreVisualState(
       coreState({
         phase: "DISCUSSION",
         sessionStatus: "running",
         activeCores: [CORE],
+        speakingCore: CORE,
       }),
-    ).key,
-    "processing",
+    ),
+    { key: "processing", english: "SPEAKING", japanese: "情 報", flicker: false },
   );
 
-  assert.equal(
+  assert.deepEqual(
     getCoreVisualState(
       coreState({
         phase: "DISCUSSION",
         sessionStatus: "running",
-        activeCores: [],
-        acts: [
-          {
-            id: 1,
-            round: 0,
-            act: { core: CORE, kind: "POSITION", content: "A public position." },
-          },
-        ],
+        activeCores: [CORE],
+        speakingCore: "MELCHIOR-1",
       }),
-    ).key,
-    "information",
+    ),
+    { key: "listening", english: "LISTENING", japanese: "情 報", flicker: false },
   );
 });
 
@@ -77,7 +73,7 @@ test("keeps locked ballots concealed behind the processing information state", (
       key: "locked",
       english: "VOTE SEALED",
       japanese: "情 報",
-      flicker: true,
+      flicker: false,
     },
   );
 });
@@ -221,4 +217,16 @@ test("uses explicit waiting and sanitized failure copy for empty dialogs", () =>
   });
   assert.equal(failed.status, "error");
   assert.equal(failed.error, "Connection error: HTTP 503");
+});
+
+test("labels the currently presented core as speaking in its response dialog", () => {
+  const speaking = buildCoreDialogModel({
+    core: CORE,
+    question: "Proceed?",
+    phase: "DISCUSSION",
+    sessionStatus: "running",
+    speakingCore: CORE,
+  });
+
+  assert.equal(speaking.status, "speaking");
 });
