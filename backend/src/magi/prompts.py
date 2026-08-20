@@ -140,8 +140,7 @@ POSITION is not a valid review publication kind. Never write READY or PASS insid
 
 
 def _motion_text(motion: Motion) -> str:
-    context = motion.context or "(no additional context)"
-    return f"QUESTION:\n{motion.question}\n\nCONTEXT:\n{context}"
+    return f"QUESTION:\n{motion.question}"
 
 
 Transcript = Sequence[Act | ActEvent]

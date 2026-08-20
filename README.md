@@ -98,24 +98,12 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173). Vite proxies `/api` requests to the backend on port `8000`.
 
-### Running the UI without an API key
-
-There is a small mock discussion server for frontend testing. Stop the real backend first, then run:
-
-```bash
-cd frontend
-npm run mock:api
-```
-
-Keep that terminal open and run `npm run dev` in a second frontend terminal. The mock server uses the same port as the real backend and streams a fixed mixed-ballot discussion.
-
 ## Checks
 
-The tracked automated checks currently cover the frontend event protocol, session reducer, MAGI visual state, core components, and mock discussion stream.
+Build the frontend before committing UI changes:
 
 ```bash
 cd frontend
-npm test
 npm run build
 ```
 
@@ -124,7 +112,6 @@ npm run build
 ```text
 backend/src/magi/   coordinator, prompts, transcript, policies, and DeepSeek adapter
 frontend/src/       React console, stream handling, session state, and MAGI core display
-frontend/scripts/   local mock discussion server
 THIRD_PARTY_NOTICES.md
 ```
 

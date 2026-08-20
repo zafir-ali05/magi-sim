@@ -810,8 +810,7 @@ textarea:disabled {
   text-transform: uppercase;
 }
 
-.outcome-badge--approved_with_conditions,
-.outcome-badge--human_confirmation_required {
+.outcome-badge--approved_with_conditions {
   color: var(--magi-amber);
   background: repeating-linear-gradient(
     56deg,
@@ -837,36 +836,6 @@ textarea:disabled {
   gap: 18px;
   border: 1px solid var(--magi-amber);
   padding: 12px 14px;
-}
-
-.result-policy {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  margin: 0 0 14px;
-  border: 1px solid var(--magi-amber-dim);
-}
-
-.result-policy > div {
-  min-width: 0;
-  padding: 10px 12px;
-}
-
-.result-policy > div + div {
-  border-left: 1px solid var(--magi-amber-dim);
-}
-
-.result-policy dt {
-  margin-bottom: 5px;
-  color: #b87425;
-  font-size: 0.65rem;
-  letter-spacing: 0.08em;
-}
-
-.result-policy dd {
-  margin: 0;
-  color: #ffe0ad;
-  font-size: 0.78rem;
-  overflow-wrap: anywhere;
 }
 
 .result-conditions ul {

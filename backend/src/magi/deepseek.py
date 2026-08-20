@@ -6,7 +6,7 @@ import os
 from typing import Any, Literal, TypeVar
 
 from openai import AsyncOpenAI
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from .models import CoreId, Generation, TokenUsage
 
@@ -72,7 +72,7 @@ def _parse_response(content: str, schema: type[T], core: CoreId) -> T:
 
     try:
         result = schema.model_validate(payload)
-    except Exception:
+    except ValidationError:
         raise _AttemptFailure(
             "provider returned data that failed schema validation"
         ) from None

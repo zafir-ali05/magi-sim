@@ -78,14 +78,13 @@ export function MagiCoreArray({
   coreStatuses = {},
   speakingCore = null,
   ballots = null,
-  ballotsLocked = false,
   result = null,
   elapsedMs = 0,
   latestEventId = 0,
   onSelectCore = () => {},
 }) {
   const publicBallots = result ? ballots ?? [] : [];
-  const systemState = getSystemVisualState({ phase, sessionStatus, ballotsLocked, result });
+  const systemState = getSystemVisualState({ phase, sessionStatus, result });
 
   return (
     <div className="magi-system" aria-label="MAGI tri-core decision array">
@@ -125,7 +124,6 @@ export function MagiCoreArray({
                 speakingCore,
                 coreStatus: coreStatuses[core] ?? null,
                 ballot: publicBallots.find((candidate) => candidate.core === core) ?? null,
-                ballotsLocked,
               })}
               onSelectCore={onSelectCore}
             />

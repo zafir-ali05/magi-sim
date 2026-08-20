@@ -174,7 +174,6 @@ export default function App() {
         coreStatus: session.coreStatuses[selectedCore],
         acts: session.acts,
         ballot: selectedBallot,
-        ballotsLocked: session.ballotsLocked,
         error: session.error,
       })
     : null;
@@ -277,7 +276,6 @@ export default function App() {
             coreStatuses={session.coreStatuses}
             speakingCore={session.speakingCore}
             ballots={session.result ? session.ballots : null}
-            ballotsLocked={session.ballotsLocked}
             result={session.result}
             elapsedMs={session.elapsedMs}
             latestEventId={latestEventId}
@@ -332,20 +330,6 @@ export default function App() {
                 <span>{outcomeLabel(session.result.outcome)}</span>
               </div>
             </div>
-            <dl className="result-policy" aria-label="Decision policy result">
-              <div>
-                <dt>POLICY</dt>
-                <dd>{outcomeLabel(session.result.quorum)}</dd>
-              </div>
-              <div>
-                <dt>RECOMMENDATION</dt>
-                <dd>{outcomeLabel(session.result.recommendation)}</dd>
-              </div>
-              <div>
-                <dt>HUMAN CONFIRMATION</dt>
-                <dd>{session.result.requires_human_confirmation ? "REQUIRED" : "NOT REQUIRED"}</dd>
-              </div>
-            </dl>
             {session.result.conditions.length > 0 ? (
               <div className="result-conditions">
                 <span className="field-label">AGGREGATED CONDITIONS</span>

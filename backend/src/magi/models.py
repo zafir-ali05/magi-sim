@@ -28,24 +28,15 @@ ReviewPublicationKind = Literal[
     "CLARIFY",
 ]
 Vote = Literal["AGREE", "DISAGREE", "CONDITIONAL"]
-DecisionPolicy = Literal["majority", "unanimous", "human_confirm"]
-Recommendation = Literal[
-    "APPROVED",
-    "APPROVED_WITH_CONDITIONS",
-    "REJECTED",
-    "INCOMPLETE",
-]
 DecisionOutcome = Literal[
     "APPROVED",
     "APPROVED_WITH_CONDITIONS",
     "REJECTED",
-    "HUMAN_CONFIRMATION_REQUIRED",
     "INCOMPLETE",
 ]
 CoreStatus = Literal[
     "LISTENING",
     "THINKING",
-    "SPEAKING",
     "READY",
     "BUDGET_EXHAUSTED",
     "FAILED",
@@ -85,8 +76,6 @@ class _PublicModel(BaseModel):
 
 class Motion(_PublicModel):
     question: str = Field(min_length=3, max_length=2_000)
-    context: str = Field(default="", max_length=8_000)
-    quorum: DecisionPolicy = "majority"
 
 
 class Act(_PublicModel):
@@ -146,16 +135,9 @@ class CoreStatusEvent(_PublicModel):
     reviewed_through_event_id: int = Field(ge=0)
 
 
-class BallotsLockedEvent(_PublicModel):
-    type: Literal["ballots_locked"] = "ballots_locked"
-
-
 class ResultEvent(_PublicModel):
     type: Literal["result"] = "result"
-    quorum: DecisionPolicy
-    recommendation: Recommendation
     outcome: DecisionOutcome
-    requires_human_confirmation: bool
     ballots: list[Ballot]
     conditions: list[str]
     disclaimer: str
@@ -166,11 +148,4 @@ class ErrorEvent(_PublicModel):
     message: str
 
 
-StreamEvent = (
-    PhaseEvent
-    | ActEvent
-    | CoreStatusEvent
-    | BallotsLockedEvent
-    | ResultEvent
-    | ErrorEvent
-)
+StreamEvent = PhaseEvent | ActEvent | CoreStatusEvent | ResultEvent | ErrorEvent

@@ -77,7 +77,6 @@ const OUTCOME_STATES = {
   APPROVED: "agree",
   APPROVED_WITH_CONDITIONS: "conditional",
   REJECTED: "disagree",
-  HUMAN_CONFIRMATION_REQUIRED: "conditional",
   INCOMPLETE: "error",
 };
 
@@ -88,14 +87,13 @@ export function getCoreVisualState({
   speakingCore = null,
   coreStatus = null,
   ballot = null,
-  ballotsLocked = false,
 } = {}) {
   if (sessionStatus === "error" || phase === "FAILED") return CORE_STATES.error;
 
   const revealedState = VOTE_STATES[ballot?.vote];
   if (revealedState) return CORE_STATES[revealedState];
 
-  if (ballotsLocked || phase === "BALLOTING") return CORE_STATES.locked;
+  if (phase === "BALLOTING") return CORE_STATES.locked;
 
   if (sessionStatus === "running" && phase === "CONNECTING") {
     return CORE_STATES.connecting;
@@ -107,7 +105,6 @@ export function getCoreVisualState({
     const statusState = {
       THINKING: CORE_STATES.thinking,
       LISTENING: CORE_STATES.listening,
-      SPEAKING: CORE_STATES.listening,
       READY: CORE_STATES.ready,
       BUDGET_EXHAUSTED: CORE_STATES.bounded,
       FAILED: CORE_STATES.error,
@@ -121,7 +118,6 @@ export function getCoreVisualState({
 export function getSystemVisualState({
   phase = "STANDBY",
   sessionStatus = "idle",
-  ballotsLocked = false,
   result = null,
 } = {}) {
   if (sessionStatus === "error" || phase === "FAILED") return SYSTEM_STATES.error;
@@ -129,7 +125,7 @@ export function getSystemVisualState({
   const resultState = OUTCOME_STATES[result?.outcome];
   if (resultState) return SYSTEM_STATES[resultState];
 
-  if (ballotsLocked || phase === "BALLOTING") return SYSTEM_STATES.locked;
+  if (phase === "BALLOTING") return SYSTEM_STATES.locked;
 
   if (
     sessionStatus === "running" &&
@@ -163,7 +159,6 @@ export function buildCoreDialogModel({
   coreStatus = null,
   acts = [],
   ballot = null,
-  ballotsLocked = false,
   error = "",
 } = {}) {
   const state = getCoreVisualState({
@@ -173,12 +168,11 @@ export function buildCoreDialogModel({
     speakingCore,
     coreStatus,
     ballot,
-    ballotsLocked,
   });
   const responseParts = publicActLines(acts, core);
 
   if (ballot?.rationale) responseParts.push(`FINAL RATIONALE: ${ballot.rationale}`);
-  if (!ballot && (ballotsLocked || phase === "BALLOTING")) {
+  if (!ballot && phase === "BALLOTING") {
     responseParts.push("Vote sealed until all cores report.");
   }
 

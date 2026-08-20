@@ -9,19 +9,15 @@ const ACT_KINDS = [
 ];
 const VOTES = ["AGREE", "DISAGREE", "CONDITIONAL"];
 const PHASES = ["OPENING", "DISCUSSION", "BALLOTING"];
-const DECISION_POLICIES = ["majority", "unanimous", "human_confirm"];
-const RECOMMENDATIONS = ["APPROVED", "APPROVED_WITH_CONDITIONS", "REJECTED", "INCOMPLETE"];
 const OUTCOMES = [
   "APPROVED",
   "APPROVED_WITH_CONDITIONS",
   "REJECTED",
-  "HUMAN_CONFIRMATION_REQUIRED",
   "INCOMPLETE",
 ];
 const CORE_STATUSES = [
   "LISTENING",
   "THINKING",
-  "SPEAKING",
   "READY",
   "BUDGET_EXHAUSTED",
   "FAILED",
@@ -196,10 +192,7 @@ function parseResult(value) {
     value,
     [
       "type",
-      "quorum",
-      "recommendation",
       "outcome",
-      "requires_human_confirmation",
       "ballots",
       "conditions",
       "disclaimer",
@@ -227,15 +220,9 @@ function parseResult(value) {
     }
     return condition;
   });
-  if (typeof value.requires_human_confirmation !== "boolean") {
-    fail("requires_human_confirmation must be a boolean.");
-  }
   return {
     type: "result",
-    quorum: oneOf(value.quorum, DECISION_POLICIES, "quorum"),
-    recommendation: oneOf(value.recommendation, RECOMMENDATIONS, "recommendation"),
     outcome,
-    requires_human_confirmation: value.requires_human_confirmation,
     ballots,
     conditions,
     disclaimer: stringField(value, "disclaimer"),
@@ -253,9 +240,6 @@ export function parseStreamEvent(value) {
       return parseAct(value);
     case "core_status":
       return parseCoreStatus(value);
-    case "ballots_locked":
-      exactKeys(value, ["type"], "ballots_locked event");
-      return { type: "ballots_locked" };
     case "result":
       return parseResult(value);
     case "error":

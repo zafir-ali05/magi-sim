@@ -9,7 +9,6 @@ from .models import (
     CORE_ORDER,
     Act,
     Ballot,
-    BallotsLockedEvent,
     CoreId,
     CoreStatusEvent,
     Generation,
@@ -100,7 +99,7 @@ class ReactiveCoordinator:
             for event in opening_events:
                 yield CoreStatusEvent(
                     core=event.act.core,
-                    status="SPEAKING",
+                    status="LISTENING",
                     reviewed_through_event_id=0,
                 )
                 yield event
@@ -145,7 +144,7 @@ class ReactiveCoordinator:
 
             if not self.session.can_start_ballots():
                 self.session.fail()
-                yield self._incomplete_result(motion)
+                yield self._incomplete_result()
                 return
 
             self.session.begin_balloting()
@@ -181,20 +180,16 @@ class ReactiveCoordinator:
             for generation in ballots_by_core.values():
                 self.budgets.record_usage(generation.usage)
 
-            yield BallotsLockedEvent()
             if len(ballots_by_core) != len(CORE_ORDER):
                 self.session.fail()
-                yield self._incomplete_result(motion)
+                yield self._incomplete_result()
                 return
 
             ballots = [ballots_by_core[core].value for core in CORE_ORDER]
-            decision = reduce_ballots(motion.quorum, ballots)
+            decision = reduce_ballots(ballots)
             self.session.begin_revealing()
             yield ResultEvent(
-                quorum=motion.quorum,
-                recommendation=decision.recommendation,
                 outcome=decision.outcome,
-                requires_human_confirmation=decision.requires_human_confirmation,
                 ballots=ballots,
                 conditions=list(decision.conditions),
                 disclaimer=DISCLAIMER,
@@ -400,7 +395,7 @@ class ReactiveCoordinator:
             event = self.transcript.append(act, seen_through_event_id=seen_version)
             if event.id == seen_version + 1:
                 self.session.mark_reviewed(core, event.id)
-            self._emit_status(core, "SPEAKING")
+            self._emit_status(core, "LISTENING")
             self._emit(event)
             # a new public act makes the old READY states stale
             self.session.revoke_peer_readiness(sender=core)
@@ -442,7 +437,6 @@ class ReactiveCoordinator:
         status: Literal[
             "LISTENING",
             "THINKING",
-            "SPEAKING",
             "READY",
             "BUDGET_EXHAUSTED",
             "FAILED",
@@ -462,12 +456,9 @@ class ReactiveCoordinator:
         self._output.put_nowait(event)
         self._changed.set()
 
-    def _incomplete_result(self, motion: Motion) -> ResultEvent:
+    def _incomplete_result(self) -> ResultEvent:
         return ResultEvent(
-            quorum=motion.quorum,
-            recommendation="INCOMPLETE",
             outcome="INCOMPLETE",
-            requires_human_confirmation=True,
             ballots=[],
             conditions=[],
             disclaimer=DISCLAIMER,

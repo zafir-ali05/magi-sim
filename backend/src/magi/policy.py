@@ -7,26 +7,21 @@ from .models import (
     CORE_ORDER,
     Ballot,
     DecisionOutcome,
-    DecisionPolicy,
-    Recommendation,
 )
 
 
 @dataclass(frozen=True)
 class PolicyDecision:
-    recommendation: Recommendation
     outcome: DecisionOutcome
-    requires_human_confirmation: bool
     conditions: tuple[str, ...]
 
 
 def reduce_ballots(
-    policy: DecisionPolicy,
     ballots: Sequence[Ballot],
 ) -> PolicyDecision:
     by_core = {ballot.core: ballot for ballot in ballots}
     if len(ballots) != len(CORE_ORDER) or set(by_core) != set(CORE_ORDER):
-        return PolicyDecision("INCOMPLETE", "INCOMPLETE", True, ())
+        return PolicyDecision("INCOMPLETE", ())
 
     ordered = tuple(by_core[core] for core in CORE_ORDER)
     # keep the first copy when two ballots use the exact same condition
@@ -37,28 +32,10 @@ def reduce_ballots(
     )
     affirmative = sum(ballot.vote in {"AGREE", "CONDITIONAL"} for ballot in ordered)
     if affirmative < 2:
-        recommendation: Recommendation = "REJECTED"
+        outcome: DecisionOutcome = "REJECTED"
     elif any(ballot.vote == "CONDITIONAL" for ballot in ordered):
-        recommendation = "APPROVED_WITH_CONDITIONS"
+        outcome = "APPROVED_WITH_CONDITIONS"
     else:
-        recommendation = "APPROVED"
+        outcome = "APPROVED"
 
-    if policy == "human_confirm":
-        return PolicyDecision(
-            recommendation,
-            "HUMAN_CONFIRMATION_REQUIRED",
-            True,
-            conditions,
-        )
-    if policy == "unanimous":
-        if all(ballot.vote == "AGREE" for ballot in ordered):
-            return PolicyDecision(recommendation, "APPROVED", False, conditions)
-        if any(ballot.vote == "DISAGREE" for ballot in ordered):
-            return PolicyDecision(recommendation, "REJECTED", False, conditions)
-        return PolicyDecision(
-            recommendation,
-            "HUMAN_CONFIRMATION_REQUIRED",
-            True,
-            conditions,
-        )
-    return PolicyDecision(recommendation, recommendation, False, conditions)
+    return PolicyDecision(outcome, conditions)

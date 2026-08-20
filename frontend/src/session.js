@@ -19,7 +19,6 @@ export function createSession(startedAt = null) {
     acts: [],
     speakingCore: null,
     pendingSpeakers: [],
-    ballotsLocked: false,
     ballots: null,
     result: null,
     error: "",
@@ -61,13 +60,6 @@ export function applyStreamEvent(session, event) {
           : session.pendingSpeakers,
       };
     }
-    case "ballots_locked":
-      return {
-        ...session,
-        status: "running",
-        phase: "BALLOTING",
-        ballotsLocked: true,
-      };
     case "result":
       return {
         ...session,
@@ -76,7 +68,6 @@ export function applyStreamEvent(session, event) {
         activeCores: [],
         speakingCore: null,
         pendingSpeakers: [],
-        ballotsLocked: true,
         ballots: event.ballots,
         result: event,
         error: "",

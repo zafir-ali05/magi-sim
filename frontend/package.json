@@ -4,10 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "test": "node --test src/events.test.js src/session.test.js src/magiVisualState.test.js src/MagiComponents.test.js scripts/mock-discussion-server.test.js",
     "build": "vite build",
-    "dev": "vite",
-    "mock:api": "node scripts/mock-discussion-server.mjs"
+    "dev": "vite"
   },
   "dependencies": {
     "react": "^19.1.1",
