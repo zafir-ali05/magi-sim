@@ -54,6 +54,9 @@ class BudgetLedger:
             and self._contributions[core] < self.limits.max_contributions_per_core
         )
 
+    def has_contributed(self, core: CoreId) -> bool:
+        return self._contributions[core] > 0
+
     def remaining_evaluations(self, core: CoreId) -> int:
         return max(0, self.limits.max_evaluations_per_core - self._evaluations[core])
 

@@ -49,7 +49,9 @@ After that, each core has a worker and an `asyncio.Queue` inbox. The queue messa
 - `PASS` because nothing useful needs to be added yet.
 - `READY` because the core has reviewed the current version and has no remaining public objection.
 
-There is no fixed MELCHIOR -> BALTHASAR -> CASPER loop. A core can respond a few times, stay quiet, concede something, or mark itself ready. A new act wakes the other cores again because their previous review is now stale.
+Each core must publish once during its first shared review before `PASS` or `READY` becomes available. That gives every successful deliberation at least six public acts: three openings and three initial reviews.
+
+There is no fixed MELCHIOR -> BALTHASAR -> CASPER loop after the openings. A core can respond a few more times, stay quiet, concede something, or mark itself ready. A new act wakes the other cores again because their previous review is now stale.
 
 The workers stay alive for one deliberation. Every response is still a fresh API call with that core's identity, the motion, and the current public transcript. The coordinator and queues are what make it feel like one continuing discussion. Honestly, that is enough for this local version without pulling in Redis or some huge agent framework.
 
@@ -71,14 +73,14 @@ Private provider reasoning is never displayed, saved, streamed, or passed betwee
 
 ## Stack
 
-- **Frontend:** React 19, Vite 7, and plain CSS
-- **Backend:** Python 3.14.7, FastAPI, Pydantic, and `asyncio`
-- **LLM:** DeepSeek V4 Pro through its API
+- **Frontend:** React, Vite, and plain CSS
+- **Backend:** Python, FastAPI, Pydantic, and `asyncio`
+- **LLM:** DeepSeek V4 Flash through its API
 - **Streaming:** JSON over one HTTP response
 
 ## Running it locally
 
-You will need Python 3.12 or newer, [uv](https://docs.astral.sh/uv/), Node.js with npm, and a DeepSeek API key.
+You will need Python 3.12 or newer, uv, Node.js with npm, and a DeepSeek API key (or any OpenAI compatible provider).
 
 Start the backend in one terminal:
 
@@ -112,7 +114,6 @@ npm run build
 ```text
 backend/src/magi/   coordinator, prompts, transcript, policies, and DeepSeek adapter
 frontend/src/       React console, stream handling, session state, and MAGI core display
-THIRD_PARTY_NOTICES.md
 ```
 
 ## UI credit

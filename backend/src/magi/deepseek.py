@@ -119,7 +119,7 @@ async def ask_deepseek(
         provider_failure = False
         try:
             response = await client.chat.completions.create(
-                model="deepseek-v4-pro",
+                model="deepseek-v4-flash",
                 messages=request_messages,
                 reasoning_effort=effort,
                 extra_body={"thinking": {"type": "enabled"}},

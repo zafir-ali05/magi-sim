@@ -322,6 +322,9 @@ class ReactiveCoordinator:
                             self.budgets.remaining_contributions(core),
                             self.budgets.remaining_evaluations(core),
                             state.ready,
+                            requires_public_contribution=not self.budgets.has_contributed(
+                                core
+                            ),
                         ),
                         ReviewDecision,
                         "high",
@@ -376,6 +379,13 @@ class ReactiveCoordinator:
         seen_version: int,
     ) -> bool:
         assert self.budgets is not None
+        if not self.budgets.has_contributed(core) and decision.action != "PUBLISH":
+            self._emit_status(core, "LISTENING")
+            if not self.budgets.can_evaluate(core):
+                self._mark_budget_exhausted(core)
+                return False
+            return True
+
         if decision.action == "PASS":
             self._emit_status(core, "LISTENING")
         elif decision.action == "READY":
@@ -426,6 +436,11 @@ class ReactiveCoordinator:
         self._changed.set()
 
     def _mark_budget_exhausted(self, core: CoreId) -> None:
+        assert self.budgets is not None
+        if not self.budgets.has_contributed(core):
+            self.session.mark_failed(core)
+            self._emit_status(core, "FAILED")
+            return
         if self.session.core(core).status == "BUDGET_EXHAUSTED":
             return
         self.session.mark_budget_exhausted(core)

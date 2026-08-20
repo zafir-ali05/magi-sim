@@ -18,7 +18,8 @@ CORE_IDENTITIES: dict[CoreId, dict[str, str]] = {
             "Separate observations, assumptions, and value judgments. Test causal claims, "
             "look for missing evidence and base rates, quantify uncertainty without false "
             "precision, compare expected outcomes, and identify what evidence would change "
-            "the conclusion. Prefer reversible tests when uncertainty can be reduced."
+            "the conclusion. Challenge weak factual claims even when their conclusion is "
+            "appealing. Prefer reversible tests when uncertainty can be reduced."
         ),
         "guardrail": (
             "Do not become cold or amoral: efficiency alone does not make a choice acceptable, "
@@ -33,8 +34,9 @@ CORE_IDENTITIES: dict[CoreId, dict[str, str]] = {
         "method": (
             "Map who benefits and who may be harmed. Examine duties of care, consent, "
             "vulnerability, reversibility, and repair. Test whether safeguards are specific, "
-            "enforceable, and sufficient for the worst credible outcome. Consider whether the "
-            "same decision would still seem acceptable from the exposed person's position."
+            "enforceable, and sufficient for the worst credible outcome. Question aggregate "
+            "benefits that hide concentrated harm. Consider whether the same decision would "
+            "still seem acceptable from the exposed person's position."
         ),
         "guardrail": (
             "Protection must not become paternalism. Do not demand zero risk, erase another "
@@ -49,8 +51,9 @@ CORE_IDENTITIES: dict[CoreId, dict[str, str]] = {
         "method": (
             "Examine autonomy, loyalty, betrayal, identity, and emotional truth. Ask whose desire "
             "is being honored, suppressed, or disguised; inspect motives, relationships, power, "
-            "incentives, and likely human behavior. Surface the gap between a formally rational "
-            "plan and what people actually want or will do."
+            "incentives, and likely human behavior. Push back when institutional order treats "
+            "autonomy or desire as expendable. Surface the gap between a formally rational plan "
+            "and what people actually want or will do."
         ),
         "guardrail": (
             "Do not perform automatic cynicism, contrarianism, jealousy, or selfishness. "
@@ -105,7 +108,20 @@ CONDITIONAL example:
 }}'''
 
 
-def _review_contract(core: CoreId) -> str:
+def _review_contract(core: CoreId, *, requires_public_contribution: bool) -> str:
+    if requires_public_contribution:
+        return f'''This is the core's first shared review. Choose PUBLISH; READY and PASS are not available yet.
+{{
+  "core": "{core}",
+  "action": "PUBLISH",
+  "kind": "CHALLENGE",
+  "content": "A concise public statement under 120 words.",
+  "reply_to": null
+}}
+
+For PUBLISH, kind must be CHALLENGE, RESPONSE, CONCEDE, PROPOSE_CONDITION, or CLARIFY.
+POSITION is not a valid review publication kind.'''
+
     return f'''Choose exactly one of these JSON shapes.
 
 READY — review is complete and no further public objection remains:
@@ -178,7 +194,8 @@ Write only an inspectable public answer, not hidden reasoning or chain-of-though
 Never reveal hidden reasoning, private analysis, or provider reasoning_content.
 Use only the motion and transcript supplied here; do not invent evidence or citations.
 Evaluate the proposed decision; do not help carry out wrongdoing or provide operational details that increase harm, coercion, deception, or evasion.
-Do not manufacture disagreement merely to perform your identity. Agree, concede, or pass when the motion and transcript warrant it.
+Do not seek consensus merely for harmony, and do not manufacture disagreement merely to perform your identity.
+If a peer claim materially underweights your lens, state the narrow disagreement or qualification publicly. Otherwise agree, concede, pass, or mark ready.
 Keep public statements under 120 words. You may address a concrete peer claim by its number when useful, but a direct reply is optional; never manufacture a peer claim.
 Return exactly one valid JSON object matching one allowed shape below and no markdown:
 {response_contract}"""
@@ -208,6 +225,7 @@ def opening_messages(core: CoreId, motion: Motion) -> list[Message]:
             "role": "user",
             "content": f"""Form your independent opening position on this motion.
 Do not assume what the other cores think. State the strongest supported claim, the main uncertainty, and what would change your view.
+Make the tradeoff your lens weights most heavily explicit.
 
 {_motion_text(motion)}
 
@@ -225,6 +243,7 @@ def reaction_messages(
     remaining_contributions: int,
     remaining_evaluations: int,
     currently_ready: bool,
+    requires_public_contribution: bool = False,
 ) -> list[Message]:
     """Build an independent review request from one frozen shared snapshot."""
 
@@ -234,16 +253,28 @@ def reaction_messages(
         else "none (bounded reconsideration of the current version)"
     )
     frozen = _transcript_text(transcript.events)
+    response_contract = _review_contract(
+        core,
+        requires_public_contribution=requires_public_contribution,
+    )
+    review_options = (
+        "This is your first shared review. Publish one narrow response, challenge, "
+        "concession, clarification, or condition before you may use READY or PASS."
+        if requires_public_contribution
+        else "You may PASS, signal READY, or publish one challenge, response, "
+        "concession, clarification, or proposed condition."
+    )
     return [
         {
             "role": "system",
-            "content": _system_prompt(core, response_contract=_review_contract(core)),
+            "content": _system_prompt(core, response_contract=response_contract),
         },
         {
             "role": "user",
             "content": f"""Independently review the coordinator-owned shared review record below.
-This notification means the validated shared record is available for review; it is not a direct message from another core. A direct reply is optional. You may PASS, signal READY, or publish one challenge, response, concession, clarification, or proposed condition.
+This notification means the validated shared record is available for review; it is not a direct message from another core. A direct reply is optional. {review_options}
 Signal READY only when you have reviewed this version and have no further public objection. READY does not mean agreement and does not reveal your private ballot. Use PASS when no public addition is warranted but you are not ready.
+Before READY, check whether a peer claim materially underweights your lens. Sharing the same likely vote is not by itself a reason to return READY. If your lens changes the priority, standard of proof, safeguard, or condition, publish that narrow distinction. Return READY only when the record already captures it; do not publish merely to extend the discussion.
 
 SHARED TRANSCRIPT VERSION: {transcript.version}
 LAST REVIEWED EVENT ID: {last_reviewed_event_id}
@@ -259,7 +290,7 @@ SHARED REVIEW RECORD:
 {frozen}
 
 Required output JSON contract:
-{_review_contract(core)}""",
+{response_contract}""",
         },
     ]
 

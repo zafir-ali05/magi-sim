@@ -597,8 +597,8 @@ textarea:disabled {
 }
 
 .magi-system__core--error .magi-system__core-inner {
-  color: #ff6f5f;
-  background: var(--magi-black);
+  color: var(--magi-black);
+  background: var(--magi-disagree);
 }
 
 .magi-system__core--listening .magi-system__core-inner,
