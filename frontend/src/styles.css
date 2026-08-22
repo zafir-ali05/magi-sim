@@ -168,10 +168,6 @@ textarea:focus-visible {
   gap: 6px;
 }
 
-.field-label span {
-  color: var(--magi-amber-light);
-}
-
 textarea {
   display: block;
   width: 100%;

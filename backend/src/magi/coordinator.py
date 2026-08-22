@@ -33,10 +33,6 @@ Ask = Callable[
 ]
 
 
-class CoordinatorFailure(Exception):
-    """Sanitized internal marker for provider or public-model failures."""
-
-
 class ReactiveCoordinator:
     def __init__(
         self,
@@ -61,12 +57,8 @@ class ReactiveCoordinator:
         self._deadline_task: asyncio.Task[None] | None = None
         self._timed_out = False
         self._motion: Motion | None = None
-        self._started = False
 
     async def run(self, motion: Motion) -> AsyncIterator[StreamEvent]:
-        if self._started:
-            raise RuntimeError("ReactiveCoordinator instances can run only once")
-        self._started = True
         self._motion = motion
 
         try:
@@ -94,7 +86,7 @@ class ReactiveCoordinator:
                     for generation in openings
                 ]
             except ValueError:
-                raise CoordinatorFailure from None
+                raise RuntimeError from None
             self.transcript = staged_transcript
             for event in opening_events:
                 yield CoreStatusEvent(
@@ -120,7 +112,6 @@ class ReactiveCoordinator:
             while reason is None:
                 while not self._output.empty():
                     event = self._output.get_nowait()
-                    self._output.task_done()
                     yield event
                 reason = self._closure_reason()
                 if reason is not None:
@@ -135,12 +126,11 @@ class ReactiveCoordinator:
             await asyncio.gather(*self._workers, return_exceptions=True)
             while not self._output.empty():
                 event = self._output.get_nowait()
-                self._output.task_done()
                 yield event
 
             if any(not self.session.core(core).ballot_eligible for core in CORE_ORDER):
                 reason = "failure"
-            self.session.close_discussion(reason=reason)
+            self.session.close_discussion()
 
             if not self.session.can_start_ballots():
                 self.session.fail()
@@ -234,7 +224,7 @@ class ReactiveCoordinator:
                 for task in pending:
                     task.cancel()
                 await asyncio.gather(*tasks, return_exceptions=True)
-                raise CoordinatorFailure
+                raise RuntimeError
             await asyncio.gather(*pending)
             return [task.result() for task in tasks]
         except asyncio.CancelledError:
@@ -353,7 +343,6 @@ class ReactiveCoordinator:
                 return
             finally:
                 for _ in range(consumed):
-                    self.inboxes[core].task_done()
                     self.session.note_dequeued(core)
                 if consumed:
                     self._changed.set()

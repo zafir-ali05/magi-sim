@@ -16,8 +16,6 @@ SessionPhase = Literal[
     "FAILED",
     "CANCELLED",
 ]
-ClosureReason = Literal["natural", "budget", "timeout", "failure"]
-
 TERMINAL_PHASES = frozenset({"COMPLETED", "FAILED", "CANCELLED"})
 
 
@@ -35,7 +33,6 @@ class CoreRuntimeState:
 class MagiSession:
     def __init__(self) -> None:
         self.phase: SessionPhase = "CREATED"
-        self.closure_reason: ClosureReason | None = None
         self._cores = {core: CoreRuntimeState() for core in CORE_ORDER}
 
     def core(self, core: CoreId) -> CoreRuntimeState:
@@ -136,9 +133,8 @@ class MagiSession:
             for state in self._cores.values()
         )
 
-    def close_discussion(self, *, reason: ClosureReason) -> None:
+    def close_discussion(self) -> None:
         self._require_discussing()
-        self.closure_reason = reason
         self.phase = "DISCUSSION_CLOSED"
 
     def can_start_ballots(self) -> bool:

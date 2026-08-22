@@ -48,12 +48,6 @@ class BudgetLedger:
             and self._evaluations[core] < self.limits.max_evaluations_per_core
         )
 
-    def can_contribute(self, core: CoreId) -> bool:
-        return (
-            not self.discussion_expired()
-            and self._contributions[core] < self.limits.max_contributions_per_core
-        )
-
     def has_contributed(self, core: CoreId) -> bool:
         return self._contributions[core] > 0
 

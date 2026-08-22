@@ -4,12 +4,6 @@ import { getCoreVisualState, getSystemVisualState } from "./magiVisualState.js";
 
 const CORE_ORDER = ["BALTHASAR-2", "CASPER-3", "MELCHIOR-1"];
 
-const CORE_META = {
-  "BALTHASAR-2": { name: "BALTHASAR", order: 2, className: "balthasar" },
-  "CASPER-3": { name: "CASPER", order: 3, className: "casper" },
-  "MELCHIOR-1": { name: "MELCHIOR", order: 1, className: "melchior" },
-};
-
 function formatElapsed(milliseconds) {
   const totalSeconds = Math.max(0, Math.floor((milliseconds ?? 0) / 1000));
   const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
@@ -54,19 +48,20 @@ function SystemResponse({ state }) {
 }
 
 function CoreButton({ core, state, speaking, onSelectCore }) {
-  const meta = CORE_META[core];
+  const [name, order] = core.split("-");
+  const className = name.toLowerCase();
   const speakingClass = speaking ? " magi-system__core--speaking" : "";
 
   return (
     <button
       type="button"
-      className={`magi-system__core magi-system__core--${meta.className} magi-system__core--${state.key}${speakingClass}`}
+      className={`magi-system__core magi-system__core--${className} magi-system__core--${state.key}${speakingClass}`}
       title="Click for status"
-      aria-label={`${meta.name} ${meta.order}: ${state.english}. Click for status`}
+      aria-label={`${name} ${order}: ${state.english}. Click for status`}
       onClick={() => onSelectCore(core)}
     >
       <span className="magi-system__core-inner">
-        {meta.name} • {meta.order}
+        {name} • {order}
       </span>
     </button>
   );

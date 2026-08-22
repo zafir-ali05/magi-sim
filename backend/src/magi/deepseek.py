@@ -26,24 +26,17 @@ def _account_usage(response: Any) -> TokenUsage:
     """Count tokens without keeping private reasoning."""
 
     usage = getattr(response, "usage", None)
-    if usage is None:
-        return TokenUsage(0, 0, 0, 0)
-
-    aggregate: dict[str, int] = {}
-    for field in ("prompt_tokens", "completion_tokens", "total_tokens"):
-        value = getattr(usage, field, 0)
-        aggregate[field] = value if isinstance(value, int) else 0
-
     details = getattr(usage, "completion_tokens_details", None)
-    reasoning_tokens = getattr(details, "reasoning_tokens", 0)
-    aggregate["reasoning_tokens"] = (
-        reasoning_tokens if isinstance(reasoning_tokens, int) else 0
-    )
+
+    def count(source: Any, field: str) -> int:
+        value = getattr(source, field, 0)
+        return value if isinstance(value, int) else 0
+
     return TokenUsage(
-        prompt_tokens=aggregate["prompt_tokens"],
-        completion_tokens=aggregate["completion_tokens"],
-        reasoning_tokens=aggregate["reasoning_tokens"],
-        total_tokens=aggregate["total_tokens"],
+        prompt_tokens=count(usage, "prompt_tokens"),
+        completion_tokens=count(usage, "completion_tokens"),
+        reasoning_tokens=count(details, "reasoning_tokens"),
+        total_tokens=count(usage, "total_tokens"),
     )
 
 
